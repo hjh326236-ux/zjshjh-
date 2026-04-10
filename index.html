@@ -33,6 +33,7 @@
 
         <div class="actions">
           <a class="btn btn--ghost" href="/admin">进入后台</a>
+          <button class="btn btn--ghost" id="bgmToggle" type="button" aria-label="切换背景音乐">播放音乐</button>
           <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题">
             <span class="icon" data-icon="sun" aria-hidden="true"></span>
           </button>
@@ -315,6 +316,8 @@
     </footer>
 
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <audio id="bgmAudio" loop preload="metadata" src="./audio/im-waiting.mp3"></audio>
 
     <script src="./script.js"></script>
   </body>

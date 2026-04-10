@@ -168,6 +168,37 @@ def api_admin_add_skill():
     return jsonify({"ok": True})
 
 
+@app.put("/api/admin/skills/<int:skill_id>")
+def api_admin_update_skill(skill_id: int):
+    payload = json_body()
+    category = str(payload.get("category", "")).strip()
+    skill_name = str(payload.get("skill_name", "")).strip()
+    level = payload.get("level", 70)
+
+    if category not in ["熟练", "了解", "正在学习"]:
+        return jsonify({"error": "category 必须是 熟练/了解/正在学习"}), 400
+
+    if not skill_name:
+        return jsonify({"error": "skill_name 不能为空"}), 400
+
+    try:
+        level = int(level)
+    except Exception:
+        return jsonify({"error": "level 必须是数字"}), 400
+
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE skills SET category = ?, skill_name = ?, level = ? WHERE id = ?",
+            (category, skill_name, level, skill_id),
+        )
+        conn.commit()
+
+    if cur.rowcount == 0:
+        return jsonify({"error": "skill 不存在"}), 404
+
+    return jsonify({"ok": True})
+
+
 @app.delete("/api/admin/skills/<int:skill_id>")
 def api_admin_delete_skill(skill_id: int):
     with get_conn() as conn:
@@ -195,6 +226,32 @@ def api_admin_add_project():
             [data[k] for k in keys],
         )
         conn.commit()
+
+    return jsonify({"ok": True})
+
+
+@app.put("/api/admin/projects/<int:project_id>")
+def api_admin_update_project(project_id: int):
+    payload = json_body()
+    data = pick(payload, PROJECT_FIELDS)
+
+    if not data:
+        return jsonify({"error": "没有可更新字段"}), 400
+
+    if "title" in data and not str(data.get("title", "")).strip():
+        return jsonify({"error": "title 不能为空"}), 400
+
+    keys = list(data.keys())
+    set_clause = ", ".join([f"{k} = ?" for k in keys])
+    values = [data[k] for k in keys]
+    values.append(project_id)
+
+    with get_conn() as conn:
+        cur = conn.execute(f"UPDATE projects SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+
+    if cur.rowcount == 0:
+        return jsonify({"error": "project 不存在"}), 404
 
     return jsonify({"ok": True})
 
@@ -229,6 +286,36 @@ def api_admin_add_experience():
             [data[k] for k in keys],
         )
         conn.commit()
+
+    return jsonify({"ok": True})
+
+
+@app.put("/api/admin/experiences/<int:experience_id>")
+def api_admin_update_experience(experience_id: int):
+    payload = json_body()
+    data = pick(payload, EXPERIENCE_FIELDS)
+
+    if not data:
+        return jsonify({"error": "没有可更新字段"}), 400
+
+    if "organization" in data and not str(data.get("organization", "")).strip():
+        return jsonify({"error": "organization 不能为空"}), 400
+    if "role" in data and not str(data.get("role", "")).strip():
+        return jsonify({"error": "role 不能为空"}), 400
+    if "period" in data and not str(data.get("period", "")).strip():
+        return jsonify({"error": "period 不能为空"}), 400
+
+    keys = list(data.keys())
+    set_clause = ", ".join([f"{k} = ?" for k in keys])
+    values = [data[k] for k in keys]
+    values.append(experience_id)
+
+    with get_conn() as conn:
+        cur = conn.execute(f"UPDATE experiences SET {set_clause} WHERE id = ?", values)
+        conn.commit()
+
+    if cur.rowcount == 0:
+        return jsonify({"error": "experience 不存在"}), 404
 
     return jsonify({"ok": True})
 

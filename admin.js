@@ -9,14 +9,66 @@ function toast(msg) {
   toast._t = window.setTimeout(() => el.classList.remove("is-on"), 1800);
 }
 
+function setErrorDetail(text = "") {
+  const box = $("#errorBox");
+  const detail = $("#errorDetail");
+  if (!box || !detail) return;
+  if (!text) {
+    box.style.display = "none";
+    detail.textContent = "";
+    return;
+  }
+  box.style.display = "block";
+  detail.textContent = text;
+}
+
 async function req(url, options = {}) {
-  const resp = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(data?.error || "请求失败");
-  return data;
+  try {
+    const resp = await fetch(url, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+
+    const text = await resp.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { raw: text };
+    }
+
+    if (!resp.ok) {
+      const message = data?.error || `请求失败 (${resp.status})`;
+      setErrorDetail(
+        [
+          `URL: ${url}`,
+          `Method: ${options.method || "GET"}`,
+          `Status: ${resp.status}`,
+          `Message: ${message}`,
+          text ? `Response: ${text}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
+      throw new Error(message);
+    }
+
+    setErrorDetail("");
+    return data;
+  } catch (err) {
+    if (err instanceof TypeError) {
+      setErrorDetail(
+        [
+          `URL: ${url}`,
+          `Method: ${options.method || "GET"}`,
+          "Status: NETWORK_ERROR",
+          "Message: 无法连接后端服务，请确认 python app.py 正在运行。",
+        ].join("\n")
+      );
+      throw new Error("网络错误：请确认后端服务已启动");
+    }
+    throw err;
+  }
 }
 
 function fillProfile(profile = {}) {
@@ -47,7 +99,10 @@ function renderSkills(skills = []) {
       (s) => `
       <div class="item row">
         <div><strong>${s.skill_name}</strong> <span class="mono">[${s.category}] level=${s.level ?? "-"}</span></div>
-        <button class="btn btn--tiny btn--ghost" data-del-skill="${s.id}">删除</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn--tiny" data-edit-skill="${encodeURIComponent(JSON.stringify(s))}">编辑</button>
+          <button class="btn btn--tiny btn--ghost" data-del-skill="${s.id}">删除</button>
+        </div>
       </div>
     `
     )
@@ -62,7 +117,10 @@ function renderProjects(projects = []) {
       (p) => `
       <div class="item row">
         <div><strong>${p.title}</strong> <span class="mono">${p.project_type || ""} · sort=${p.sort_order}</span></div>
-        <button class="btn btn--tiny btn--ghost" data-del-project="${p.id}">删除</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn--tiny" data-edit-project="${encodeURIComponent(JSON.stringify(p))}">编辑</button>
+          <button class="btn btn--tiny btn--ghost" data-del-project="${p.id}">删除</button>
+        </div>
       </div>
     `
     )
@@ -77,7 +135,10 @@ function renderExperiences(experiences = []) {
       (e) => `
       <div class="item row">
         <div><strong>${e.organization} · ${e.role}</strong> <span class="mono">${e.period} · sort=${e.sort_order}</span></div>
-        <button class="btn btn--tiny btn--ghost" data-del-experience="${e.id}">删除</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn--tiny" data-edit-experience="${encodeURIComponent(JSON.stringify(e))}">编辑</button>
+          <button class="btn btn--tiny btn--ghost" data-del-experience="${e.id}">删除</button>
+        </div>
       </div>
     `
     )
@@ -126,22 +187,42 @@ function bindActions() {
   });
 
   $("#addSkill")?.addEventListener("click", async () => {
+    const editId = $("#s_edit_id")?.value?.trim();
     const payload = {
       category: $("#s_category")?.value,
       skill_name: $("#s_skill_name")?.value?.trim(),
       level: Number($("#s_level")?.value || 70),
     };
     try {
-      await req("/api/admin/skills", { method: "POST", body: JSON.stringify(payload) });
-      toast("技能已新增");
+      if (editId) {
+        await req(`/api/admin/skills/${editId}`, { method: "PUT", body: JSON.stringify(payload) });
+        toast("技能已更新");
+      } else {
+        await req("/api/admin/skills", { method: "POST", body: JSON.stringify(payload) });
+        toast("技能已新增");
+      }
       $("#s_skill_name").value = "";
+      $("#s_level").value = "70";
+      $("#s_edit_id").value = "";
+      $("#addSkill").textContent = "新增技能";
       await loadAll();
     } catch (e) {
-      toast(e.message || "新增失败");
+      toast(e.message || "保存失败");
     }
   });
 
   $("#skillsList")?.addEventListener("click", async (e) => {
+    const editBtn = e.target.closest("[data-edit-skill]");
+    if (editBtn) {
+      const row = JSON.parse(decodeURIComponent(editBtn.dataset.editSkill));
+      $("#s_edit_id").value = String(row.id || "");
+      $("#s_category").value = row.category || "熟练";
+      $("#s_skill_name").value = row.skill_name || "";
+      $("#s_level").value = String(row.level ?? 70);
+      $("#addSkill").textContent = "更新技能";
+      return;
+    }
+
     const btn = e.target.closest("[data-del-skill]");
     if (!btn) return;
     try {
@@ -154,6 +235,7 @@ function bindActions() {
   });
 
   $("#addProject")?.addEventListener("click", async () => {
+    const editId = $("#pr_edit_id")?.value?.trim();
     const payload = {
       title: $("#pr_title")?.value?.trim(),
       project_type: $("#pr_project_type")?.value?.trim(),
@@ -167,19 +249,44 @@ function bindActions() {
     };
 
     try {
-      await req("/api/admin/projects", { method: "POST", body: JSON.stringify(payload) });
-      toast("项目已新增");
+      if (editId) {
+        await req(`/api/admin/projects/${editId}`, { method: "PUT", body: JSON.stringify(payload) });
+        toast("项目已更新");
+      } else {
+        await req("/api/admin/projects", { method: "POST", body: JSON.stringify(payload) });
+        toast("项目已新增");
+      }
       ["#pr_title", "#pr_project_type", "#pr_summary", "#pr_contribution", "#pr_tech_stack", "#pr_result_text", "#pr_preview_url", "#pr_source_url"].forEach((sel) => {
         const el = $(sel);
         if (el) el.value = "";
       });
+      $("#pr_sort_order").value = "0";
+      $("#pr_edit_id").value = "";
+      $("#addProject").textContent = "新增项目";
       await loadAll();
     } catch (e) {
-      toast(e.message || "新增失败");
+      toast(e.message || "保存失败");
     }
   });
 
   $("#projectsList")?.addEventListener("click", async (e) => {
+    const editBtn = e.target.closest("[data-edit-project]");
+    if (editBtn) {
+      const row = JSON.parse(decodeURIComponent(editBtn.dataset.editProject));
+      $("#pr_edit_id").value = String(row.id || "");
+      $("#pr_title").value = row.title || "";
+      $("#pr_project_type").value = row.project_type || "";
+      $("#pr_summary").value = row.summary || "";
+      $("#pr_contribution").value = row.contribution || "";
+      $("#pr_tech_stack").value = row.tech_stack || "";
+      $("#pr_result_text").value = row.result_text || "";
+      $("#pr_preview_url").value = row.preview_url || "";
+      $("#pr_source_url").value = row.source_url || "";
+      $("#pr_sort_order").value = String(row.sort_order ?? 0);
+      $("#addProject").textContent = "更新项目";
+      return;
+    }
+
     const btn = e.target.closest("[data-del-project]");
     if (!btn) return;
     try {
@@ -192,6 +299,7 @@ function bindActions() {
   });
 
   $("#addExperience")?.addEventListener("click", async () => {
+    const editId = $("#e_edit_id")?.value?.trim();
     const payload = {
       organization: $("#e_organization")?.value?.trim(),
       role: $("#e_role")?.value?.trim(),
@@ -203,19 +311,42 @@ function bindActions() {
     };
 
     try {
-      await req("/api/admin/experiences", { method: "POST", body: JSON.stringify(payload) });
-      toast("经历已新增");
+      if (editId) {
+        await req(`/api/admin/experiences/${editId}`, { method: "PUT", body: JSON.stringify(payload) });
+        toast("经历已更新");
+      } else {
+        await req("/api/admin/experiences", { method: "POST", body: JSON.stringify(payload) });
+        toast("经历已新增");
+      }
       ["#e_organization", "#e_role", "#e_period", "#e_summary", "#e_achievement_1", "#e_achievement_2"].forEach((sel) => {
         const el = $(sel);
         if (el) el.value = "";
       });
+      $("#e_sort_order").value = "0";
+      $("#e_edit_id").value = "";
+      $("#addExperience").textContent = "新增经历";
       await loadAll();
     } catch (e) {
-      toast(e.message || "新增失败");
+      toast(e.message || "保存失败");
     }
   });
 
   $("#experiencesList")?.addEventListener("click", async (e) => {
+    const editBtn = e.target.closest("[data-edit-experience]");
+    if (editBtn) {
+      const row = JSON.parse(decodeURIComponent(editBtn.dataset.editExperience));
+      $("#e_edit_id").value = String(row.id || "");
+      $("#e_organization").value = row.organization || "";
+      $("#e_role").value = row.role || "";
+      $("#e_period").value = row.period || "";
+      $("#e_summary").value = row.summary || "";
+      $("#e_achievement_1").value = row.achievement_1 || "";
+      $("#e_achievement_2").value = row.achievement_2 || "";
+      $("#e_sort_order").value = String(row.sort_order ?? 0);
+      $("#addExperience").textContent = "更新经历";
+      return;
+    }
+
     const btn = e.target.closest("[data-del-experience]");
     if (!btn) return;
     try {

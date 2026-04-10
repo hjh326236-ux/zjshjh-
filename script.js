@@ -84,6 +84,48 @@ function initResume() {
   });
 }
 
+function initBgm() {
+  const audio = qs("#bgmAudio");
+  const btn = qs("#bgmToggle");
+  if (!audio || !btn) return;
+
+  const key = "self_intro_bgm_enabled";
+
+  const update = (playing) => {
+    btn.textContent = playing ? "暂停音乐" : "播放音乐";
+    btn.setAttribute("aria-pressed", playing ? "true" : "false");
+  };
+
+  const start = async () => {
+    try {
+      await audio.play();
+      update(true);
+      localStorage.setItem(key, "1");
+    } catch {
+      update(false);
+      toast("浏览器限制自动播放，请点击播放");
+    }
+  };
+
+  const stop = () => {
+    audio.pause();
+    update(false);
+    localStorage.setItem(key, "0");
+  };
+
+  btn.addEventListener("click", () => {
+    if (audio.paused) start();
+    else stop();
+  });
+
+  const saved = localStorage.getItem(key);
+  if (saved === "1") start();
+  else update(false);
+
+  audio.addEventListener("play", () => update(true));
+  audio.addEventListener("pause", () => update(false));
+}
+
 function escapeHtml(text = "") {
   return String(text)
     .replaceAll("&", "&amp;")
@@ -266,5 +308,6 @@ qs("#themeToggle")?.addEventListener("click", () => {
 initCopyActions();
 initFooterYear();
 initResume();
+initBgm();
 initContactForm();
 loadSiteData();

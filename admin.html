@@ -22,6 +22,10 @@
     <div class="admin-wrap">
       <h1>后台管理</h1>
       <p class="muted">用于维护个人资料、技能、项目、经历。保存后前台会自动使用新数据。</p>
+      <div class="card" id="errorBox" style="display:none; margin-bottom:14px; border-color:#ef4444;">
+        <h3 class="card__title" style="color:#ef4444;">请求错误详情</h3>
+        <pre id="errorDetail" class="mono" style="white-space:pre-wrap; margin:0;"></pre>
+      </div>
 
       <section class="card admin-section">
         <h2 class="card__title">个人资料</h2>
@@ -44,6 +48,7 @@
 
       <section class="card admin-section">
         <h2 class="card__title">技能</h2>
+        <input type="hidden" id="s_edit_id" />
         <div class="admin-grid">
           <label class="field"><span class="field__label">分类</span><select class="field__input" id="s_category"><option>熟练</option><option>了解</option><option>正在学习</option></select></label>
           <label class="field"><span class="field__label">技能名</span><input class="field__input" id="s_skill_name" /></label>
@@ -55,6 +60,7 @@
 
       <section class="card admin-section">
         <h2 class="card__title">项目</h2>
+        <input type="hidden" id="pr_edit_id" />
         <div class="admin-grid">
           <label class="field"><span class="field__label">标题</span><input class="field__input" id="pr_title" /></label>
           <label class="field"><span class="field__label">类型</span><input class="field__input" id="pr_project_type" /></label>
@@ -72,6 +78,7 @@
 
       <section class="card admin-section">
         <h2 class="card__title">经历</h2>
+        <input type="hidden" id="e_edit_id" />
         <div class="admin-grid">
           <label class="field"><span class="field__label">机构</span><input class="field__input" id="e_organization" /></label>
           <label class="field"><span class="field__label">角色</span><input class="field__input" id="e_role" /></label>
