@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="个人自我介绍网站 / 作品集" />
+    <title>我的自我介绍</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+
+    <header class="topbar" id="top">
+      <div class="container topbar__inner">
+        <a class="brand" href="#top" aria-label="返回顶部">
+          <span class="brand__dot" aria-hidden="true"></span>
+          <span class="brand__text">林墨 · 个人网站</span>
+        </a>
+
+        <nav class="nav" aria-label="主导航">
+          <a class="nav__link" href="#about">关于</a>
+          <a class="nav__link" href="#skills">技能</a>
+          <a class="nav__link" href="#projects">项目</a>
+          <a class="nav__link" href="#experience">经历</a>
+          <a class="nav__link" href="#contact">联系</a>
+        </nav>
+
+        <div class="actions">
+          <button class="icon-btn" id="themeToggle" type="button" aria-label="切换主题">
+            <span class="icon" data-icon="sun" aria-hidden="true"></span>
+          </button>
+          <button class="btn btn--ghost" id="copyLink" type="button">复制主页链接</button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero">
+        <div class="container hero__inner">
+          <div class="hero__card">
+            <div class="hero__avatar" role="img" aria-label="头像占位符">你</div>
+            <div class="hero__content">
+              <p class="kicker">你好，我是</p>
+              <h1 class="hero__title">
+                <span class="grad" id="profileName">林墨（Mo Lin）</span>
+              </h1>
+              <p class="hero__subtitle" id="profileBio">
+                我是一名专注 Web 开发与数据产品落地的开发者，擅长把复杂需求拆解成可执行功能，并持续优化性能与体验。
+              </p>
+
+              <div class="hero__meta">
+                <span class="pill" id="profileCity">📍 上海</span>
+                <span class="pill" id="profileDirection">🎯 方向：前端工程 / 全栈开发</span>
+                <span class="pill" id="profileStatus">⏱️ 状态：积极寻找前端岗位</span>
+              </div>
+
+              <div class="hero__cta">
+                <a class="btn btn--primary" href="#projects">看项目</a>
+                <a class="btn btn--soft" href="#contact">联系我</a>
+              </div>
+
+              <div class="hero__quick">
+                <a class="link" id="githubLink" href="https://github.com/molin-dev" target="_blank" rel="noreferrer">GitHub</a>
+                <span class="sep" aria-hidden="true">·</span>
+                <a class="link" id="linkedinLink" href="https://www.linkedin.com/in/molin-dev/" target="_blank" rel="noreferrer">LinkedIn</a>
+                <span class="sep" aria-hidden="true">·</span>
+                <a class="link" href="#" id="downloadResume">下载简历（可选）</a>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero__stats" aria-label="个人亮点">
+            <div class="stat">
+              <div class="stat__num">4+</div>
+              <div class="stat__label">年前端实践</div>
+            </div>
+            <div class="stat">
+              <div class="stat__num">18+</div>
+              <div class="stat__label">项目交付</div>
+            </div>
+            <div class="stat">
+              <div class="stat__num">3</div>
+              <div class="stat__label">核心方向</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="about">
+        <div class="container">
+          <div class="section__head">
+            <h2 class="section__title">关于我</h2>
+            <p class="section__desc">用 3–5 句话讲清楚你是谁、你擅长什么、你想做什么。</p>
+          </div>
+
+          <div class="grid grid--2">
+            <div class="card">
+              <h3 class="card__title">我在做什么</h3>
+              <p class="muted">
+                目前在一家教育科技团队担任前端开发，负责学习平台的课程页、数据看板与增长活动页。过去一年我主导了
+                组件体系重构和首屏性能优化，让核心页面的加载体验更稳定。
+              </p>
+              <ul class="list">
+                <li><strong>优势 1</strong>：能把业务目标拆成清晰的技术任务</li>
+                <li><strong>优势 2</strong>：对交互细节和可用性有持续关注</li>
+                <li><strong>优势 3</strong>：沟通透明，交付节奏稳定</li>
+              </ul>
+            </div>
+
+            <div class="card">
+              <h3 class="card__title">我相信的工作方式</h3>
+              <ul class="checks">
+                <li>先明确业务目标，再选择技术方案</li>
+                <li>优先沉淀可复用组件和工程规范</li>
+                <li>基于数据和用户反馈持续迭代</li>
+                <li>关注可维护性、可测试性与稳定交付</li>
+              </ul>
+              <div class="quote">
+                <p>“代码不仅要跑起来，更要长期可维护。”</p>
+                <span class="quote__by">— 林墨</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="skills">
+        <div class="container">
+          <div class="section__head">
+            <h2 class="section__title">技能栈</h2>
+            <p class="section__desc">把技能分层：熟练、了解、正在学习，会比堆关键词更有说服力。</p>
+          </div>
+
+          <div class="grid grid--3" id="skillsGrid">
+            <div class="card">
+              <h3 class="card__title">熟练</h3>
+              <div class="tags">
+                <span class="tag">HTML/CSS</span>
+                <span class="tag">JavaScript</span>
+                <span class="tag">TypeScript</span>
+                <span class="tag">React</span>
+                <span class="tag">Next.js</span>
+              </div>
+            </div>
+            <div class="card">
+              <h3 class="card__title">了解</h3>
+              <div class="tags">
+                <span class="tag">Node.js</span>
+                <span class="tag">Express</span>
+                <span class="tag">MySQL</span>
+                <span class="tag">Docker</span>
+              </div>
+            </div>
+            <div class="card">
+              <h3 class="card__title">正在学习</h3>
+              <div class="tags">
+                <span class="tag">性能优化</span>
+                <span class="tag">工程化</span>
+                <span class="tag">系统设计</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card--wide">
+            <div class="meter">
+              <div class="meter__row">
+                <span class="meter__label">沟通与协作</span>
+                <span class="meter__bar" style="--v: 86%"></span>
+              </div>
+              <div class="meter__row">
+                <span class="meter__label">问题拆解</span>
+                <span class="meter__bar" style="--v: 82%"></span>
+              </div>
+              <div class="meter__row">
+                <span class="meter__label">交付与稳定性</span>
+                <span class="meter__bar" style="--v: 78%"></span>
+              </div>
+              <div class="meter__row">
+                <span class="meter__label">学习速度</span>
+                <span class="meter__bar" style="--v: 90%"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="projects">
+        <div class="container">
+          <div class="section__head">
+            <h2 class="section__title">项目作品</h2>
+            <p class="section__desc">建议写清楚：你负责了什么、解决了什么、结果如何、用到了哪些技术。</p>
+          </div>
+
+          <div class="grid grid--3" id="projectsGrid">
+            <article class="card project">
+              <div class="project__top">
+                <h3 class="project__title">项目 A：课程学习平台重构</h3>
+                <span class="badge">团队项目</span>
+              </div>
+              <p class="muted">
+                主导老旧学习平台的前端重构，统一页面结构和状态管理，提升课程页与练习页的交互一致性。
+              </p>
+              <ul class="list list--compact">
+                <li><strong>我的贡献</strong>：搭建组件库、拆分业务模块、推动上线灰度发布</li>
+                <li><strong>技术点</strong>：React / TypeScript / Zustand / Vite</li>
+                <li><strong>结果</strong>：首屏时间下降 32%，线上样式类问题下降 45%</li>
+              </ul>
+              <div class="project__links">
+                <a class="btn btn--tiny" href="https://example.com/learn" target="_blank" rel="noreferrer">在线预览</a>
+                <a class="btn btn--tiny btn--ghost" href="https://github.com/molin-dev/learn-platform" target="_blank" rel="noreferrer">源码</a>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="experience">
+        <div class="container">
+          <div class="section__head">
+            <h2 class="section__title">经历</h2>
+            <p class="section__desc">按时间线列出教育/实习/工作与关键成果。</p>
+          </div>
+
+          <div class="timeline" id="experienceTimeline">
+            <div class="tl-item">
+              <div class="tl-dot" aria-hidden="true"></div>
+              <div class="tl-card">
+                <div class="tl-top">
+                  <h3 class="tl-title">星火教育科技 · 前端开发工程师</h3>
+                  <span class="tl-time">2024.07 – 至今</span>
+                </div>
+                <p class="muted">负责学习平台核心业务页面与数据看板的设计开发。</p>
+                <ul class="list list--compact">
+                  <li><strong>成果</strong>：主导组件库升级，统一 40+ 页面视觉与交互规范</li>
+                  <li><strong>成果</strong>：推动性能治理，核心页面 LCP 指标提升 28%</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="contact">
+        <div class="container">
+          <div class="section__head">
+            <h2 class="section__title">联系我</h2>
+            <p class="section__desc">留下最方便联系你的方式（建议至少：邮箱 + 微信/电话其一）。</p>
+          </div>
+
+          <div class="grid grid--2">
+            <div class="card">
+              <h3 class="card__title">联系方式</h3>
+              <div class="contact">
+                <div class="contact__row">
+                  <span class="contact__k">邮箱</span>
+                  <span class="contact__v">
+                    <a class="link" id="emailLink" href="mailto:molin.dev@example.com">molin.dev@example.com</a>
+                    <button class="btn btn--tiny btn--ghost" id="copyEmail" type="button">复制</button>
+                  </span>
+                </div>
+                <div class="contact__row">
+                  <span class="contact__k">微信</span>
+                  <span class="contact__v">molin_dev</span>
+                </div>
+                <div class="contact__row">
+                  <span class="contact__k">电话</span>
+                  <span class="contact__v">(+86) 139-1111-2222</span>
+                </div>
+              </div>
+            </div>
+
+            <form class="card form" id="contactForm">
+              <h3 class="card__title">给我留言（本地演示）</h3>
+              <label class="field">
+                <span class="field__label">称呼</span>
+                <input class="field__input" name="name" placeholder="怎么称呼你" autocomplete="name" required />
+              </label>
+              <label class="field">
+                <span class="field__label">邮箱</span>
+                <input
+                  class="field__input"
+                  type="email"
+                  name="email"
+                  placeholder="方便我回复的邮箱"
+                  autocomplete="email"
+                  required
+                />
+              </label>
+              <label class="field">
+                <span class="field__label">内容</span>
+                <textarea class="field__input field__input--area" name="message" placeholder="想聊什么？" required></textarea>
+              </label>
+              <button class="btn btn--primary" type="submit">保存到本地（不联网）</button>
+              <p class="muted tiny">
+                提示：这个表单会把内容保存在浏览器本地（LocalStorage），不会发送到服务器。
+              </p>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <span class="muted">© <span id="year"></span> 林墨. All rights reserved.</span>
+        <a class="link" href="#top">回到顶部</a>
+      </div>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

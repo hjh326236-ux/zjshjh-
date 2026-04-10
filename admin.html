@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>后台管理 - 个人网站</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .admin-wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+      .admin-section { margin-bottom: 20px; }
+      .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .admin-grid input, .admin-grid textarea, .admin-grid select { width: 100%; }
+      .admin-actions { display: flex; gap: 8px; margin-top: 10px; }
+      .admin-list { margin-top: 12px; display: grid; gap: 10px; }
+      .item { border: 1px solid var(--line); padding: 10px; border-radius: 10px; background: var(--card); }
+      .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+      @media (max-width: 720px) { .admin-grid { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <div class="admin-wrap">
+      <h1>后台管理</h1>
+      <p class="muted">用于维护个人资料、技能、项目、经历。保存后前台会自动使用新数据。</p>
+
+      <section class="card admin-section">
+        <h2 class="card__title">个人资料</h2>
+        <div class="admin-grid">
+          <label class="field"><span class="field__label">中文名</span><input class="field__input" id="p_name" /></label>
+          <label class="field"><span class="field__label">英文名</span><input class="field__input" id="p_english_name" /></label>
+          <label class="field"><span class="field__label">标题</span><input class="field__input" id="p_title" /></label>
+          <label class="field"><span class="field__label">城市</span><input class="field__input" id="p_city" /></label>
+          <label class="field"><span class="field__label">方向</span><input class="field__input" id="p_direction" /></label>
+          <label class="field"><span class="field__label">状态</span><input class="field__input" id="p_status" /></label>
+          <label class="field"><span class="field__label">邮箱</span><input class="field__input" id="p_email" /></label>
+          <label class="field"><span class="field__label">微信</span><input class="field__input" id="p_wechat" /></label>
+          <label class="field"><span class="field__label">电话</span><input class="field__input" id="p_phone" /></label>
+          <label class="field"><span class="field__label">GitHub</span><input class="field__input" id="p_github_url" /></label>
+          <label class="field"><span class="field__label">LinkedIn</span><input class="field__input" id="p_linkedin_url" /></label>
+          <label class="field" style="grid-column: 1 / -1"><span class="field__label">简介</span><textarea class="field__input field__input--area" id="p_bio"></textarea></label>
+        </div>
+        <div class="admin-actions"><button class="btn btn--primary" id="saveProfile">保存资料</button></div>
+      </section>
+
+      <section class="card admin-section">
+        <h2 class="card__title">技能</h2>
+        <div class="admin-grid">
+          <label class="field"><span class="field__label">分类</span><select class="field__input" id="s_category"><option>熟练</option><option>了解</option><option>正在学习</option></select></label>
+          <label class="field"><span class="field__label">技能名</span><input class="field__input" id="s_skill_name" /></label>
+          <label class="field"><span class="field__label">Level</span><input class="field__input" id="s_level" type="number" value="70" /></label>
+        </div>
+        <div class="admin-actions"><button class="btn btn--primary" id="addSkill">新增技能</button></div>
+        <div class="admin-list" id="skillsList"></div>
+      </section>
+
+      <section class="card admin-section">
+        <h2 class="card__title">项目</h2>
+        <div class="admin-grid">
+          <label class="field"><span class="field__label">标题</span><input class="field__input" id="pr_title" /></label>
+          <label class="field"><span class="field__label">类型</span><input class="field__input" id="pr_project_type" /></label>
+          <label class="field"><span class="field__label">技术栈</span><input class="field__input" id="pr_tech_stack" /></label>
+          <label class="field"><span class="field__label">排序</span><input class="field__input" id="pr_sort_order" type="number" value="0" /></label>
+          <label class="field" style="grid-column: 1 / -1"><span class="field__label">简介</span><textarea class="field__input field__input--area" id="pr_summary"></textarea></label>
+          <label class="field" style="grid-column: 1 / -1"><span class="field__label">贡献</span><textarea class="field__input field__input--area" id="pr_contribution"></textarea></label>
+          <label class="field"><span class="field__label">预览链接</span><input class="field__input" id="pr_preview_url" /></label>
+          <label class="field"><span class="field__label">源码链接</span><input class="field__input" id="pr_source_url" /></label>
+          <label class="field" style="grid-column: 1 / -1"><span class="field__label">结果</span><textarea class="field__input field__input--area" id="pr_result_text"></textarea></label>
+        </div>
+        <div class="admin-actions"><button class="btn btn--primary" id="addProject">新增项目</button></div>
+        <div class="admin-list" id="projectsList"></div>
+      </section>
+
+      <section class="card admin-section">
+        <h2 class="card__title">经历</h2>
+        <div class="admin-grid">
+          <label class="field"><span class="field__label">机构</span><input class="field__input" id="e_organization" /></label>
+          <label class="field"><span class="field__label">角色</span><input class="field__input" id="e_role" /></label>
+          <label class="field"><span class="field__label">时间段</span><input class="field__input" id="e_period" /></label>
+          <label class="field"><span class="field__label">排序</span><input class="field__input" id="e_sort_order" type="number" value="0" /></label>
+          <label class="field" style="grid-column: 1 / -1"><span class="field__label">简介</span><textarea class="field__input field__input--area" id="e_summary"></textarea></label>
+          <label class="field" style="grid-column: 1 / -1"><span class="field__label">成果1</span><textarea class="field__input field__input--area" id="e_achievement_1"></textarea></label>
+          <label class="field" style="grid-column: 1 / -1"><span class="field__label">成果2</span><textarea class="field__input field__input--area" id="e_achievement_2"></textarea></label>
+        </div>
+        <div class="admin-actions"><button class="btn btn--primary" id="addExperience">新增经历</button></div>
+        <div class="admin-list" id="experiencesList"></div>
+      </section>
+
+      <a href="/" class="btn btn--ghost">返回前台</a>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <script src="./admin.js"></script>
+  </body>
+</html>
