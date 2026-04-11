@@ -1,27 +1,34 @@
 from __future__ import annotations
 
+import os
+import shutil
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-import os
-
 from flask import Flask, jsonify, request, send_from_directory
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "self_intro.db"
+DEFAULT_DB_PATH = BASE_DIR / "self_intro.db"
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+USE_POSTGRES = DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://")
+
+if USE_POSTGRES:
+    import psycopg
+    from psycopg.rows import dict_row
+
+RUNTIME_DB_DIR = Path(os.environ.get("DB_DIR", str(BASE_DIR))).resolve()
+DB_PATH = RUNTIME_DB_DIR / "self_intro.db"
+
+if not USE_POSTGRES:
+    RUNTIME_DB_DIR.mkdir(parents=True, exist_ok=True)
+    if not DB_PATH.exists() and DEFAULT_DB_PATH.exists():
+        shutil.copy2(DEFAULT_DB_PATH, DB_PATH)
 
 app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
 
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "zjshjh0416")
-
-
-def require_admin_token() -> tuple[dict[str, str], int] | None:
-    token = request.headers.get("X-Admin-Token", "")
-    if not token or token != ADMIN_TOKEN:
-        return jsonify({"error": "未授权：admin token 无效或缺失"}), 401
-    return None
-
 
 PROFILE_FIELDS = [
     "name",
@@ -61,21 +68,115 @@ EXPERIENCE_FIELDS = [
 ]
 
 
-def get_conn() -> sqlite3.Connection:
+def require_admin_token() -> tuple[dict[str, str], int] | None:
+    token = request.headers.get("X-Admin-Token", "")
+    if not token or token != ADMIN_TOKEN:
+        return jsonify({"error": "未授权：admin token 无效或缺失"}), 401
+    return None
+
+
+def qmark() -> str:
+    return "%s" if USE_POSTGRES else "?"
+
+
+def get_conn():
+    if USE_POSTGRES:
+        return psycopg.connect(DATABASE_URL, row_factory=dict_row)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
+def rows_to_dicts(rows: list[Any]) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
-def ensure_message_schema() -> None:
-    if not DB_PATH.exists():
+def json_body() -> dict[str, Any]:
+    return request.get_json(silent=True) or {}
+
+
+def ensure_schema() -> None:
+    if USE_POSTGRES:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS profile (
+                  id INTEGER PRIMARY KEY,
+                  name TEXT NOT NULL,
+                  english_name TEXT,
+                  title TEXT NOT NULL,
+                  city TEXT,
+                  direction TEXT,
+                  status TEXT,
+                  bio TEXT,
+                  email TEXT,
+                  wechat TEXT,
+                  phone TEXT,
+                  github_url TEXT,
+                  linkedin_url TEXT
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS skills (
+                  id SERIAL PRIMARY KEY,
+                  category TEXT NOT NULL,
+                  skill_name TEXT NOT NULL,
+                  level INTEGER
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS projects (
+                  id SERIAL PRIMARY KEY,
+                  title TEXT NOT NULL,
+                  project_type TEXT,
+                  summary TEXT,
+                  contribution TEXT,
+                  tech_stack TEXT,
+                  result_text TEXT,
+                  preview_url TEXT,
+                  source_url TEXT,
+                  sort_order INTEGER DEFAULT 0
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS experiences (
+                  id SERIAL PRIMARY KEY,
+                  organization TEXT NOT NULL,
+                  role TEXT NOT NULL,
+                  period TEXT NOT NULL,
+                  summary TEXT,
+                  achievement_1 TEXT,
+                  achievement_2 TEXT,
+                  sort_order INTEGER DEFAULT 0
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                  id SERIAL PRIMARY KEY,
+                  visitor_name TEXT NOT NULL,
+                  visitor_email TEXT NOT NULL,
+                  message TEXT NOT NULL,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  is_read INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            conn.commit()
         return
 
+    if not DB_PATH.exists():
+        raise FileNotFoundError("数据库不存在，请先运行 init_db.py")
+
     with get_conn() as conn:
+        conn.execute("SELECT 1 FROM profile LIMIT 1")
         cols = conn.execute("PRAGMA table_info(messages)").fetchall()
         if not cols:
             conn.execute(
@@ -90,52 +191,18 @@ def ensure_message_schema() -> None:
                 )
                 """
             )
-            conn.commit()
-            return
-
-        col_names = {c["name"] for c in cols}
-
-        if "is_read" not in col_names:
-            conn.execute("ALTER TABLE messages ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0")
-
+        else:
+            col_names = {c["name"] for c in cols}
+            if "is_read" not in col_names:
+                conn.execute("ALTER TABLE messages ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0")
         conn.commit()
 
 
-def json_body() -> dict[str, Any]:
-    return request.get_json(silent=True) or {}
-
-
-def ensure_db_ready() -> tuple[dict[str, str], int] | None:
-    if not DB_PATH.exists():
-        return jsonify({"error": "数据库不存在，请先运行 init_db.py"}), 500
-
+def ensure_db_ready() -> tuple[dict[str, Any], int] | None:
     try:
-        with get_conn() as conn:
-            conn.execute("SELECT 1 FROM profile LIMIT 1")
-
-            cols = conn.execute("PRAGMA table_info(profile)").fetchall()
-            col_names = {c["name"] for c in cols}
-
-            optional_profile_cols = [
-                "english_name",
-                "city",
-                "direction",
-                "status",
-                "bio",
-                "email",
-                "wechat",
-                "phone",
-                "github_url",
-                "linkedin_url",
-            ]
-            for c in optional_profile_cols:
-                if c not in col_names:
-                    conn.execute(f"ALTER TABLE profile ADD COLUMN {c} TEXT")
-
-            conn.commit()
-    except sqlite3.OperationalError:
-        return jsonify({"error": "数据库结构不完整，请先运行 init_db.py"}), 500
-
+        ensure_schema()
+    except Exception as e:
+        return jsonify({"error": f"数据库不可用：{e}"}), 500
     return None
 
 
@@ -159,11 +226,15 @@ def api_site_data():
     if db_error:
         return db_error
 
-    with get_conn() as conn:
-        profile = conn.execute("SELECT * FROM profile ORDER BY id LIMIT 1").fetchone()
-        skills = rows_to_dicts(conn.execute("SELECT * FROM skills ORDER BY id").fetchall())
-        projects = rows_to_dicts(conn.execute("SELECT * FROM projects ORDER BY sort_order, id").fetchall())
-        experiences = rows_to_dicts(conn.execute("SELECT * FROM experiences ORDER BY sort_order, id").fetchall())
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM profile ORDER BY id LIMIT 1")
+        profile = cur.fetchone()
+        cur.execute("SELECT * FROM skills ORDER BY id")
+        skills = rows_to_dicts(cur.fetchall())
+        cur.execute("SELECT * FROM projects ORDER BY sort_order, id")
+        projects = rows_to_dicts(cur.fetchall())
+        cur.execute("SELECT * FROM experiences ORDER BY sort_order, id")
+        experiences = rows_to_dicts(cur.fetchall())
 
     return jsonify(
         {
@@ -185,16 +256,17 @@ def api_admin_data():
     if db_error:
         return db_error
 
-    ensure_message_schema()
-    try:
-        with get_conn() as conn:
-            profile = conn.execute("SELECT * FROM profile ORDER BY id LIMIT 1").fetchone()
-            skills = rows_to_dicts(conn.execute("SELECT * FROM skills ORDER BY id").fetchall())
-            projects = rows_to_dicts(conn.execute("SELECT * FROM projects ORDER BY sort_order, id").fetchall())
-            experiences = rows_to_dicts(conn.execute("SELECT * FROM experiences ORDER BY sort_order, id").fetchall())
-            messages = rows_to_dicts(conn.execute("SELECT * FROM messages ORDER BY id DESC").fetchall())
-    except sqlite3.OperationalError:
-        return jsonify({"error": "数据库结构不完整，请先运行 init_db.py"}), 500
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM profile ORDER BY id LIMIT 1")
+        profile = cur.fetchone()
+        cur.execute("SELECT * FROM skills ORDER BY id")
+        skills = rows_to_dicts(cur.fetchall())
+        cur.execute("SELECT * FROM projects ORDER BY sort_order, id")
+        projects = rows_to_dicts(cur.fetchall())
+        cur.execute("SELECT * FROM experiences ORDER BY sort_order, id")
+        experiences = rows_to_dicts(cur.fetchall())
+        cur.execute("SELECT * FROM messages ORDER BY id DESC")
+        messages = rows_to_dicts(cur.fetchall())
 
     return jsonify(
         {
@@ -220,46 +292,39 @@ def api_admin_update_profile():
     payload = json_body()
 
     try:
-        with get_conn() as conn:
-            cols = conn.execute("PRAGMA table_info(profile)").fetchall()
-            col_names = {c["name"] for c in cols}
-
-            data = {k: payload.get(k) for k in PROFILE_FIELDS if k in payload and k in col_names}
-
+        with get_conn() as conn, conn.cursor() as cur:
+            data = pick(payload, PROFILE_FIELDS)
             if not data:
                 return jsonify({"error": "没有可更新字段"}), 400
 
             if "name" in data and not str(data["name"] or "").strip():
                 return jsonify({"error": "name 不能为空"}), 400
-
             if "title" in data and not str(data["title"] or "").strip():
                 return jsonify({"error": "title 不能为空"}), 400
 
-            profile = conn.execute("SELECT id FROM profile ORDER BY id LIMIT 1").fetchone()
+            cur.execute("SELECT id FROM profile ORDER BY id LIMIT 1")
+            profile = cur.fetchone()
 
             if profile:
                 keys = list(data.keys())
-                set_clause = ", ".join([f"{k} = ?" for k in keys])
-                values = [data[k] for k in keys]
-                values.append(profile["id"])
-                conn.execute(f"UPDATE profile SET {set_clause} WHERE id = ?", values)
+                set_clause = ", ".join([f"{k} = {qmark()}" for k in keys])
+                values = [data[k] for k in keys] + [profile["id"]]
+                cur.execute(f"UPDATE profile SET {set_clause} WHERE id = {qmark()}", values)
             else:
                 keys = ["id", *data.keys()]
-                placeholders = ", ".join(["?"] * len(keys))
+                placeholders = ", ".join([qmark()] * len(keys))
                 values = [1, *[data[k] for k in data.keys()]]
-                conn.execute(
-                    f"INSERT INTO profile ({', '.join(keys)}) VALUES ({placeholders})",
-                    values,
-                )
+                cur.execute(f"INSERT INTO profile ({', '.join(keys)}) VALUES ({placeholders})", values)
 
             conn.commit()
-    except sqlite3.Error as e:
+    except Exception as e:
         return jsonify(
             {
                 "error": f"保存资料失败：{e}",
-                "db_path": str(DB_PATH),
-                "db_writable": os.access(DB_PATH, os.W_OK),
-                "dir_writable": os.access(BASE_DIR, os.W_OK),
+                "db_mode": "postgres" if USE_POSTGRES else "sqlite",
+                "db_path": None if USE_POSTGRES else str(DB_PATH),
+                "db_writable": None if USE_POSTGRES else os.access(DB_PATH, os.W_OK),
+                "dir_writable": None if USE_POSTGRES else os.access(DB_PATH.parent, os.W_OK),
             }
         ), 500
 
@@ -279,7 +344,6 @@ def api_admin_add_skill():
 
     if category not in ["熟练", "了解", "正在学习"]:
         return jsonify({"error": "category 必须是 熟练/了解/正在学习"}), 400
-
     if not skill_name:
         return jsonify({"error": "skill_name 不能为空"}), 400
 
@@ -288,9 +352,9 @@ def api_admin_add_skill():
     except Exception:
         return jsonify({"error": "level 必须是数字"}), 400
 
-    with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO skills (category, skill_name, level) VALUES (?, ?, ?)",
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO skills (category, skill_name, level) VALUES ({qmark()}, {qmark()}, {qmark()})",
             (category, skill_name, level),
         )
         conn.commit()
@@ -311,7 +375,6 @@ def api_admin_update_skill(skill_id: int):
 
     if category not in ["熟练", "了解", "正在学习"]:
         return jsonify({"error": "category 必须是 熟练/了解/正在学习"}), 400
-
     if not skill_name:
         return jsonify({"error": "skill_name 不能为空"}), 400
 
@@ -320,16 +383,16 @@ def api_admin_update_skill(skill_id: int):
     except Exception:
         return jsonify({"error": "level 必须是数字"}), 400
 
-    with get_conn() as conn:
-        cur = conn.execute(
-            "UPDATE skills SET category = ?, skill_name = ?, level = ? WHERE id = ?",
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"UPDATE skills SET category = {qmark()}, skill_name = {qmark()}, level = {qmark()} WHERE id = {qmark()}",
             (category, skill_name, level, skill_id),
         )
+        rowcount = cur.rowcount
         conn.commit()
 
-    if cur.rowcount == 0:
+    if rowcount == 0:
         return jsonify({"error": "skill 不存在"}), 404
-
     return jsonify({"ok": True})
 
 
@@ -339,8 +402,8 @@ def api_admin_delete_skill(skill_id: int):
     if auth_error:
         return auth_error
 
-    with get_conn() as conn:
-        conn.execute("DELETE FROM skills WHERE id = ?", (skill_id,))
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(f"DELETE FROM skills WHERE id = {qmark()}", (skill_id,))
         conn.commit()
     return jsonify({"ok": True})
 
@@ -358,12 +421,11 @@ def api_admin_add_project():
         return jsonify({"error": "title 不能为空"}), 400
 
     data.setdefault("sort_order", 0)
-
     keys = list(data.keys())
-    placeholders = ", ".join(["?"] * len(keys))
+    placeholders = ", ".join([qmark()] * len(keys))
 
-    with get_conn() as conn:
-        conn.execute(
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
             f"INSERT INTO projects ({', '.join(keys)}) VALUES ({placeholders})",
             [data[k] for k in keys],
         )
@@ -383,22 +445,20 @@ def api_admin_update_project(project_id: int):
 
     if not data:
         return jsonify({"error": "没有可更新字段"}), 400
-
     if "title" in data and not str(data.get("title", "")).strip():
         return jsonify({"error": "title 不能为空"}), 400
 
     keys = list(data.keys())
-    set_clause = ", ".join([f"{k} = ?" for k in keys])
-    values = [data[k] for k in keys]
-    values.append(project_id)
+    set_clause = ", ".join([f"{k} = {qmark()}" for k in keys])
+    values = [data[k] for k in keys] + [project_id]
 
-    with get_conn() as conn:
-        cur = conn.execute(f"UPDATE projects SET {set_clause} WHERE id = ?", values)
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(f"UPDATE projects SET {set_clause} WHERE id = {qmark()}", values)
+        rowcount = cur.rowcount
         conn.commit()
 
-    if cur.rowcount == 0:
+    if rowcount == 0:
         return jsonify({"error": "project 不存在"}), 404
-
     return jsonify({"ok": True})
 
 
@@ -408,8 +468,8 @@ def api_admin_delete_project(project_id: int):
     if auth_error:
         return auth_error
 
-    with get_conn() as conn:
-        conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(f"DELETE FROM projects WHERE id = {qmark()}", (project_id,))
         conn.commit()
     return jsonify({"ok": True})
 
@@ -425,17 +485,15 @@ def api_admin_add_experience():
 
     if not str(data.get("organization", "")).strip() or not str(data.get("role", "")).strip():
         return jsonify({"error": "organization 和 role 不能为空"}), 400
-
     if not str(data.get("period", "")).strip():
         return jsonify({"error": "period 不能为空"}), 400
 
     data.setdefault("sort_order", 0)
-
     keys = list(data.keys())
-    placeholders = ", ".join(["?"] * len(keys))
+    placeholders = ", ".join([qmark()] * len(keys))
 
-    with get_conn() as conn:
-        conn.execute(
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
             f"INSERT INTO experiences ({', '.join(keys)}) VALUES ({placeholders})",
             [data[k] for k in keys],
         )
@@ -455,7 +513,6 @@ def api_admin_update_experience(experience_id: int):
 
     if not data:
         return jsonify({"error": "没有可更新字段"}), 400
-
     if "organization" in data and not str(data.get("organization", "")).strip():
         return jsonify({"error": "organization 不能为空"}), 400
     if "role" in data and not str(data.get("role", "")).strip():
@@ -464,17 +521,16 @@ def api_admin_update_experience(experience_id: int):
         return jsonify({"error": "period 不能为空"}), 400
 
     keys = list(data.keys())
-    set_clause = ", ".join([f"{k} = ?" for k in keys])
-    values = [data[k] for k in keys]
-    values.append(experience_id)
+    set_clause = ", ".join([f"{k} = {qmark()}" for k in keys])
+    values = [data[k] for k in keys] + [experience_id]
 
-    with get_conn() as conn:
-        cur = conn.execute(f"UPDATE experiences SET {set_clause} WHERE id = ?", values)
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(f"UPDATE experiences SET {set_clause} WHERE id = {qmark()}", values)
+        rowcount = cur.rowcount
         conn.commit()
 
-    if cur.rowcount == 0:
+    if rowcount == 0:
         return jsonify({"error": "experience 不存在"}), 404
-
     return jsonify({"ok": True})
 
 
@@ -484,8 +540,8 @@ def api_admin_delete_experience(experience_id: int):
     if auth_error:
         return auth_error
 
-    with get_conn() as conn:
-        conn.execute("DELETE FROM experiences WHERE id = ?", (experience_id,))
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(f"DELETE FROM experiences WHERE id = {qmark()}", (experience_id,))
         conn.commit()
     return jsonify({"ok": True})
 
@@ -496,17 +552,16 @@ def api_admin_mark_message_read(message_id: int):
     if auth_error:
         return auth_error
 
-    ensure_message_schema()
     payload = json_body()
     is_read = 1 if payload.get("is_read", True) else 0
 
-    with get_conn() as conn:
-        cur = conn.execute("UPDATE messages SET is_read = ? WHERE id = ?", (is_read, message_id))
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(f"UPDATE messages SET is_read = {qmark()} WHERE id = {qmark()}", (is_read, message_id))
+        rowcount = cur.rowcount
         conn.commit()
 
-    if cur.rowcount == 0:
+    if rowcount == 0:
         return jsonify({"error": "message 不存在"}), 404
-
     return jsonify({"ok": True})
 
 
@@ -516,11 +571,9 @@ def api_admin_export_messages_csv():
     if auth_error:
         return auth_error
 
-    ensure_message_schema()
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT id, visitor_name, visitor_email, message, is_read, created_at FROM messages ORDER BY id DESC"
-        ).fetchall()
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id, visitor_name, visitor_email, message, is_read, created_at FROM messages ORDER BY id DESC")
+        rows = cur.fetchall()
 
     def esc(v: Any) -> str:
         text = str(v or "").replace('"', '""')
@@ -551,8 +604,9 @@ def api_admin_export_messages_csv():
 
 @app.post("/api/messages")
 def api_messages():
-    if not DB_PATH.exists():
-        return jsonify({"error": "数据库不存在，请先运行 init_db.py"}), 500
+    db_error = ensure_db_ready()
+    if db_error:
+        return db_error
 
     payload = json_body()
     name = str(payload.get("name", "")).strip()
@@ -562,9 +616,9 @@ def api_messages():
     if not name or not email or not message:
         return jsonify({"error": "name、email、message 不能为空"}), 400
 
-    with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO messages (visitor_name, visitor_email, message) VALUES (?, ?, ?)",
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute(
+            f"INSERT INTO messages (visitor_name, visitor_email, message) VALUES ({qmark()}, {qmark()}, {qmark()})",
             (name, email, message),
         )
         conn.commit()
