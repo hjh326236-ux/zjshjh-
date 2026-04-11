@@ -6,47 +6,53 @@
     <title>后台管理 - 个人网站</title>
     <link rel="stylesheet" href="./styles.css" />
     <style>
-      .admin-wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
-      .admin-section { margin-bottom: 20px; }
-      .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .admin-wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+      .admin-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; }
+      .admin-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       .admin-grid input, .admin-grid textarea, .admin-grid select { width: 100%; }
-      .admin-actions { display: flex; gap: 8px; margin-top: 10px; }
-      .admin-list { margin-top: 12px; display: grid; gap: 10px; }
-      .item { border: 1px solid var(--line); padding: 10px; border-radius: 10px; background: var(--card); }
-      .row { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
-      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
-      @media (max-width: 720px) { .admin-grid { grid-template-columns: 1fr; } }
+      .admin-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+      .admin-list { margin-top: 12px; display:grid; gap:10px; }
+      .item { border:1px solid var(--border); border-radius: 10px; padding:10px; background:var(--card); }
+      .row { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
+      .status-pill { font-size:12px; padding:6px 10px; border-radius: 999px; border:1px solid var(--border); }
+      .ok { color:#22c55e; }
+      .err { color:#ef4444; }
+      @media (max-width: 780px) { .admin-grid { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
     <div class="admin-wrap">
-      <h1>后台管理</h1>
-      <p class="muted">用于维护个人资料、技能、项目、经历。保存后前台会自动使用新数据。</p>
+      <div class="admin-head">
+        <div>
+          <h1 style="margin:0 0 6px;">后台管理（重构版）</h1>
+          <p class="muted" style="margin:0;">可维护个人资料、技能、项目、经历和留言。</p>
+        </div>
+        <a href="/" class="btn btn--ghost">返回前台</a>
+      </div>
 
-      <div class="card admin-section" id="authBox">
-        <h2 class="card__title">管理访问验证</h2>
-        <p class="muted">请输入管理 Token 才能继续操作（仅本地简单保护）。</p>
+      <section class="card" style="margin-bottom:14px;">
+        <h2 class="card__title">连接与鉴权</h2>
         <div class="admin-grid">
-          <label class="field" style="grid-column: 1 / -1">
+          <label class="field" style="grid-column:1 / -1;">
             <span class="field__label">管理 Token</span>
             <input class="field__input" id="adminToken" type="password" placeholder="输入管理 Token" />
           </label>
         </div>
         <div class="admin-actions">
-          <button class="btn btn--primary" id="saveToken">保存 Token</button>
-          <button class="btn btn--ghost" id="clearToken">清除 Token</button>
-          <button class="btn btn--ghost" id="checkConnection">连接自检</button>
+          <button class="btn btn--primary" id="saveToken" type="button">保存 Token</button>
+          <button class="btn btn--ghost" id="clearToken" type="button">清除 Token</button>
+          <button class="btn btn--ghost" id="checkConnection" type="button">连接自检</button>
+          <span class="status-pill" id="connBadge">未检测</span>
         </div>
-        <p class="muted tiny">提示：Token 会保存在当前浏览器 LocalStorage。</p>
-        <p class="muted tiny" id="connectionStatus">状态：未检测</p>
-      </div>
+      </section>
 
       <div class="card" id="errorBox" style="display:none; margin-bottom:14px; border-color:#ef4444;">
         <h3 class="card__title" style="color:#ef4444;">请求错误详情</h3>
         <pre id="errorDetail" class="mono" style="white-space:pre-wrap; margin:0;"></pre>
       </div>
 
-      <section class="card admin-section">
+      <section class="card" style="margin-bottom:14px;">
         <h2 class="card__title">个人资料</h2>
         <div class="admin-grid">
           <label class="field"><span class="field__label">中文名</span><input class="field__input" id="p_name" /></label>
@@ -60,12 +66,12 @@
           <label class="field"><span class="field__label">电话</span><input class="field__input" id="p_phone" /></label>
           <label class="field"><span class="field__label">GitHub</span><input class="field__input" id="p_github_url" /></label>
           <label class="field"><span class="field__label">LinkedIn</span><input class="field__input" id="p_linkedin_url" /></label>
-          <label class="field" style="grid-column: 1 / -1"><span class="field__label">简介</span><textarea class="field__input field__input--area" id="p_bio"></textarea></label>
+          <label class="field" style="grid-column:1 / -1;"><span class="field__label">简介</span><textarea class="field__input field__input--area" id="p_bio"></textarea></label>
         </div>
-        <div class="admin-actions"><button class="btn btn--primary" id="saveProfile">保存资料</button></div>
+        <div class="admin-actions"><button class="btn btn--primary" id="saveProfile" type="button">保存资料</button></div>
       </section>
 
-      <section class="card admin-section">
+      <section class="card" style="margin-bottom:14px;">
         <h2 class="card__title">技能</h2>
         <input type="hidden" id="s_edit_id" />
         <div class="admin-grid">
@@ -73,11 +79,11 @@
           <label class="field"><span class="field__label">技能名</span><input class="field__input" id="s_skill_name" /></label>
           <label class="field"><span class="field__label">Level</span><input class="field__input" id="s_level" type="number" value="70" /></label>
         </div>
-        <div class="admin-actions"><button class="btn btn--primary" id="addSkill">新增技能</button></div>
+        <div class="admin-actions"><button class="btn btn--primary" id="saveSkill" type="button">新增技能</button></div>
         <div class="admin-list" id="skillsList"></div>
       </section>
 
-      <section class="card admin-section">
+      <section class="card" style="margin-bottom:14px;">
         <h2 class="card__title">项目</h2>
         <input type="hidden" id="pr_edit_id" />
         <div class="admin-grid">
@@ -91,11 +97,11 @@
           <label class="field"><span class="field__label">源码链接</span><input class="field__input" id="pr_source_url" /></label>
           <label class="field" style="grid-column: 1 / -1"><span class="field__label">结果</span><textarea class="field__input field__input--area" id="pr_result_text"></textarea></label>
         </div>
-        <div class="admin-actions"><button class="btn btn--primary" id="addProject">新增项目</button></div>
+        <div class="admin-actions"><button class="btn btn--primary" id="saveProject" type="button">新增项目</button></div>
         <div class="admin-list" id="projectsList"></div>
       </section>
 
-      <section class="card admin-section">
+      <section class="card" style="margin-bottom:14px;">
         <h2 class="card__title">经历</h2>
         <input type="hidden" id="e_edit_id" />
         <div class="admin-grid">
@@ -107,21 +113,18 @@
           <label class="field" style="grid-column: 1 / -1"><span class="field__label">成果1</span><textarea class="field__input field__input--area" id="e_achievement_1"></textarea></label>
           <label class="field" style="grid-column: 1 / -1"><span class="field__label">成果2</span><textarea class="field__input field__input--area" id="e_achievement_2"></textarea></label>
         </div>
-        <div class="admin-actions"><button class="btn btn--primary" id="addExperience">新增经历</button></div>
+        <div class="admin-actions"><button class="btn btn--primary" id="saveExperience" type="button">新增经历</button></div>
         <div class="admin-list" id="experiencesList"></div>
       </section>
 
-      <section class="card admin-section">
+      <section class="card">
         <h2 class="card__title">留言管理</h2>
-        <p class="muted">可查看留言、标记已读，并导出 CSV。</p>
         <div class="admin-actions">
-          <button class="btn btn--ghost" id="refreshMessages">刷新留言</button>
-          <button class="btn btn--primary" id="exportMessages">导出 CSV</button>
+          <button class="btn btn--ghost" id="refreshMessages" type="button">刷新留言</button>
+          <button class="btn btn--primary" id="exportMessages" type="button">导出 CSV</button>
         </div>
         <div class="admin-list" id="messagesList"></div>
       </section>
-
-      <a href="/" class="btn btn--ghost">返回前台</a>
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>

@@ -1,14 +1,9 @@
 const $ = (s, el = document) => el.querySelector(s);
 const ADMIN_TOKEN_KEY = "self_intro_admin_token";
 
-function getAdminToken() {
-  return localStorage.getItem(ADMIN_TOKEN_KEY) || "";
-}
-
-function setAdminToken(token) {
-  if (!token) localStorage.removeItem(ADMIN_TOKEN_KEY);
-  else localStorage.setItem(ADMIN_TOKEN_KEY, token);
-}
+const state = {
+  messages: [],
+};
 
 function toast(msg) {
   const el = $("#toast");
@@ -17,6 +12,15 @@ function toast(msg) {
   el.classList.add("is-on");
   window.clearTimeout(toast._t);
   toast._t = window.setTimeout(() => el.classList.remove("is-on"), 1800);
+}
+
+function setConnBadge(text, ok = null) {
+  const el = $("#connBadge");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("ok", "err");
+  if (ok === true) el.classList.add("ok");
+  if (ok === false) el.classList.add("err");
 }
 
 function setErrorDetail(text = "") {
@@ -32,60 +36,70 @@ function setErrorDetail(text = "") {
   detail.textContent = text;
 }
 
+function getToken() {
+  return localStorage.getItem(ADMIN_TOKEN_KEY) || "";
+}
+
+function setToken(token) {
+  if (!token) localStorage.removeItem(ADMIN_TOKEN_KEY);
+  else localStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
+
 async function req(url, options = {}) {
+  const token = getToken();
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers["X-Admin-Token"] = token;
+
+  const resp = await fetch(url, { ...options, headers });
+  const text = await resp.text();
+
+  let data = {};
   try {
-    const token = getAdminToken();
-    const headers = {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    };
-    if (token) headers["X-Admin-Token"] = token;
-
-    const resp = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    const text = await resp.text();
-    let data = {};
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = { raw: text };
-    }
-
-    if (!resp.ok) {
-      const message = data?.error || `请求失败 (${resp.status})`;
-      setErrorDetail(
-        [
-          `URL: ${url}`,
-          `Method: ${options.method || "GET"}`,
-          `Status: ${resp.status}`,
-          `Message: ${message}`,
-          text ? `Response: ${text}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n")
-      );
-      throw new Error(message);
-    }
-
-    setErrorDetail("");
-    return data;
-  } catch (err) {
-    if (err instanceof TypeError) {
-      setErrorDetail(
-        [
-          `URL: ${url}`,
-          `Method: ${options.method || "GET"}`,
-          "Status: NETWORK_ERROR",
-          "Message: 无法连接后端服务，请确认 python app.py 正在运行。",
-        ].join("\n")
-      );
-      throw new Error("网络错误：请确认后端服务已启动");
-    }
-    throw err;
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
   }
+
+  if (!resp.ok) {
+    const message = data?.error || `请求失败 (${resp.status})`;
+    setErrorDetail(
+      [
+        `URL: ${url}`,
+        `Method: ${options.method || "GET"}`,
+        `Status: ${resp.status}`,
+        `Message: ${message}`,
+        text ? `Response: ${text}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n")
+    );
+    throw new Error(message);
+  }
+
+  setErrorDetail("");
+  return data;
+}
+
+function profilePayload() {
+  const keys = [
+    "name",
+    "english_name",
+    "title",
+    "city",
+    "direction",
+    "status",
+    "bio",
+    "email",
+    "wechat",
+    "phone",
+    "github_url",
+    "linkedin_url",
+  ];
+  const out = {};
+  keys.forEach((k) => {
+    out[k] = $(`#p_${k}`)?.value?.trim() ?? "";
+  });
+  return out;
 }
 
 function fillProfile(profile = {}) {
@@ -165,7 +179,6 @@ function renderExperiences(experiences = []) {
 function renderMessages(messages = []) {
   const root = $("#messagesList");
   if (!root) return;
-
   if (!messages.length) {
     root.innerHTML = '<div class="item"><p class="muted">暂无留言</p></div>';
     return;
@@ -175,24 +188,22 @@ function renderMessages(messages = []) {
     .map(
       (m) => `
       <div class="item">
-        <div class="row" style="align-items:flex-start;">
+        <div class="row">
           <div>
             <strong>${m.visitor_name || "匿名"}</strong>
             <div class="mono">${m.visitor_email || "-"} · ${m.created_at || ""}</div>
           </div>
-          <div style="display:flex; gap:8px;">
-            <span class="badge ${m.is_read ? "badge--soft" : ""}">${m.is_read ? "已读" : "未读"}</span>
-            <button class="btn btn--tiny btn--ghost" data-mark-read="${m.id}">${m.is_read ? "标记未读" : "标记已读"}</button>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span class="status-pill ${m.is_read ? "ok" : "err"}">${m.is_read ? "已读" : "未读"}</span>
+            <button class="btn btn--tiny btn--ghost" data-toggle-read="${m.id}">${m.is_read ? "标记未读" : "标记已读"}</button>
           </div>
         </div>
-        <p class="muted" style="margin-top:8px;">${(m.message || "").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</p>
+        <p class="muted" style="margin-top:8px;">${String(m.message || "").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</p>
       </div>
     `
     )
     .join("");
 }
-
-let latestMessages = [];
 
 async function loadAll() {
   const data = await req("/api/admin/data");
@@ -200,86 +211,43 @@ async function loadAll() {
   renderSkills(data.skills || []);
   renderProjects(data.projects || []);
   renderExperiences(data.experiences || []);
-  latestMessages = data.messages || [];
-  renderMessages(latestMessages);
+  state.messages = data.messages || [];
+  renderMessages(state.messages);
 }
 
-function profilePayload() {
-  const keys = [
-    "name",
-    "english_name",
-    "title",
-    "city",
-    "direction",
-    "status",
-    "bio",
-    "email",
-    "wechat",
-    "phone",
-    "github_url",
-    "linkedin_url",
-  ];
-  const out = {};
-  keys.forEach((k) => {
-    out[k] = $(`#p_${k}`)?.value?.trim() ?? "";
-  });
-  return out;
-}
-
-function bindAuthActions() {
+function bindAuth() {
   const tokenInput = $("#adminToken");
-  const saveBtn = $("#saveToken");
-  const clearBtn = $("#clearToken");
-  const checkBtn = $("#checkConnection");
-  const status = $("#connectionStatus");
+  if (tokenInput) tokenInput.value = getToken();
 
-  const setStatus = (text) => {
-    if (status) status.textContent = text;
-  };
-
-  if (tokenInput) tokenInput.value = getAdminToken();
-
-  saveBtn?.addEventListener("click", () => {
+  $("#saveToken")?.addEventListener("click", async () => {
     const token = tokenInput?.value?.trim() || "";
-    if (!token) {
-      toast("请输入 Token");
-      return;
-    }
-    setAdminToken(token);
+    if (!token) return toast("请输入 Token");
+    setToken(token);
     toast("Token 已保存");
-    setStatus("状态：Token 已保存，建议点击自检");
+    await checkConnection();
   });
 
-  clearBtn?.addEventListener("click", () => {
-    setAdminToken("");
+  $("#clearToken")?.addEventListener("click", () => {
+    setToken("");
     if (tokenInput) tokenInput.value = "";
+    setConnBadge("未检测", null);
     toast("Token 已清除");
-    setStatus("状态：Token 已清除");
   });
 
-  checkBtn?.addEventListener("click", async () => {
-    const token = tokenInput?.value?.trim() || getAdminToken();
-    if (!token) {
-      toast("请先输入 Token");
-      setStatus("状态：缺少 Token");
-      return;
-    }
+  $("#checkConnection")?.addEventListener("click", checkConnection);
+}
 
-    setStatus("状态：检测中...");
-    try {
-      const resp = await fetch("/api/admin/data", {
-        headers: { "X-Admin-Token": token },
-      });
-      const text = await resp.text();
-      if (!resp.ok) throw new Error(text || `HTTP ${resp.status}`);
-      setStatus("状态：连接正常，Token 有效");
-      toast("连接正常");
-    } catch (err) {
-      setStatus("状态：连接失败，请检查 Token 或后端");
-      toast("连接失败");
-      setErrorDetail(`自检失败：${err.message || err}`);
-    }
-  });
+async function checkConnection() {
+  try {
+    const data = await req("/api/admin/health");
+    setConnBadge(`连接正常 · ${data.db_mode || "unknown"}`, true);
+    toast("连接正常");
+    return true;
+  } catch (e) {
+    setConnBadge("连接失败", false);
+    toast(e.message || "连接失败");
+    return false;
+  }
 }
 
 function bindActions() {
@@ -293,13 +261,14 @@ function bindActions() {
     }
   });
 
-  $("#addSkill")?.addEventListener("click", async () => {
+  $("#saveSkill")?.addEventListener("click", async () => {
     const editId = $("#s_edit_id")?.value?.trim();
     const payload = {
       category: $("#s_category")?.value,
       skill_name: $("#s_skill_name")?.value?.trim(),
       level: Number($("#s_level")?.value || 70),
     };
+
     try {
       if (editId) {
         await req(`/api/admin/skills/${editId}`, { method: "PUT", body: JSON.stringify(payload) });
@@ -311,7 +280,7 @@ function bindActions() {
       $("#s_skill_name").value = "";
       $("#s_level").value = "70";
       $("#s_edit_id").value = "";
-      $("#addSkill").textContent = "新增技能";
+      $("#saveSkill").textContent = "新增技能";
       await loadAll();
     } catch (e) {
       toast(e.message || "保存失败");
@@ -326,14 +295,14 @@ function bindActions() {
       $("#s_category").value = row.category || "熟练";
       $("#s_skill_name").value = row.skill_name || "";
       $("#s_level").value = String(row.level ?? 70);
-      $("#addSkill").textContent = "更新技能";
+      $("#saveSkill").textContent = "更新技能";
       return;
     }
 
-    const btn = e.target.closest("[data-del-skill]");
-    if (!btn) return;
+    const delBtn = e.target.closest("[data-del-skill]");
+    if (!delBtn) return;
     try {
-      await req(`/api/admin/skills/${btn.dataset.delSkill}`, { method: "DELETE" });
+      await req(`/api/admin/skills/${delBtn.dataset.delSkill}`, { method: "DELETE" });
       toast("技能已删除");
       await loadAll();
     } catch (err) {
@@ -341,7 +310,7 @@ function bindActions() {
     }
   });
 
-  $("#addProject")?.addEventListener("click", async () => {
+  $("#saveProject")?.addEventListener("click", async () => {
     const editId = $("#pr_edit_id")?.value?.trim();
     const payload = {
       title: $("#pr_title")?.value?.trim(),
@@ -369,7 +338,7 @@ function bindActions() {
       });
       $("#pr_sort_order").value = "0";
       $("#pr_edit_id").value = "";
-      $("#addProject").textContent = "新增项目";
+      $("#saveProject").textContent = "新增项目";
       await loadAll();
     } catch (e) {
       toast(e.message || "保存失败");
@@ -390,14 +359,14 @@ function bindActions() {
       $("#pr_preview_url").value = row.preview_url || "";
       $("#pr_source_url").value = row.source_url || "";
       $("#pr_sort_order").value = String(row.sort_order ?? 0);
-      $("#addProject").textContent = "更新项目";
+      $("#saveProject").textContent = "更新项目";
       return;
     }
 
-    const btn = e.target.closest("[data-del-project]");
-    if (!btn) return;
+    const delBtn = e.target.closest("[data-del-project]");
+    if (!delBtn) return;
     try {
-      await req(`/api/admin/projects/${btn.dataset.delProject}`, { method: "DELETE" });
+      await req(`/api/admin/projects/${delBtn.dataset.delProject}`, { method: "DELETE" });
       toast("项目已删除");
       await loadAll();
     } catch (err) {
@@ -405,7 +374,7 @@ function bindActions() {
     }
   });
 
-  $("#addExperience")?.addEventListener("click", async () => {
+  $("#saveExperience")?.addEventListener("click", async () => {
     const editId = $("#e_edit_id")?.value?.trim();
     const payload = {
       organization: $("#e_organization")?.value?.trim(),
@@ -431,7 +400,7 @@ function bindActions() {
       });
       $("#e_sort_order").value = "0";
       $("#e_edit_id").value = "";
-      $("#addExperience").textContent = "新增经历";
+      $("#saveExperience").textContent = "新增经历";
       await loadAll();
     } catch (e) {
       toast(e.message || "保存失败");
@@ -450,14 +419,14 @@ function bindActions() {
       $("#e_achievement_1").value = row.achievement_1 || "";
       $("#e_achievement_2").value = row.achievement_2 || "";
       $("#e_sort_order").value = String(row.sort_order ?? 0);
-      $("#addExperience").textContent = "更新经历";
+      $("#saveExperience").textContent = "更新经历";
       return;
     }
 
-    const btn = e.target.closest("[data-del-experience]");
-    if (!btn) return;
+    const delBtn = e.target.closest("[data-del-experience]");
+    if (!delBtn) return;
     try {
-      await req(`/api/admin/experiences/${btn.dataset.delExperience}`, { method: "DELETE" });
+      await req(`/api/admin/experiences/${delBtn.dataset.delExperience}`, { method: "DELETE" });
       toast("经历已删除");
       await loadAll();
     } catch (err) {
@@ -466,11 +435,11 @@ function bindActions() {
   });
 
   $("#messagesList")?.addEventListener("click", async (e) => {
-    const btn = e.target.closest("[data-mark-read]");
+    const btn = e.target.closest("[data-toggle-read]");
     if (!btn) return;
 
-    const id = btn.dataset.markRead;
-    const row = latestMessages.find((m) => String(m.id) === String(id));
+    const id = btn.dataset.toggleRead;
+    const row = state.messages.find((m) => String(m.id) === String(id));
     const next = !(row?.is_read === 1 || row?.is_read === true);
 
     try {
@@ -495,18 +464,14 @@ function bindActions() {
   });
 
   $("#exportMessages")?.addEventListener("click", async () => {
-    const token = getAdminToken();
-    if (!token) {
-      toast("请先保存管理 Token");
-      return;
-    }
-
     try {
-      const resp = await fetch("/api/admin/messages/export.csv", {
-        headers: { "X-Admin-Token": token },
-      });
+      const token = getToken();
+      if (!token) {
+        toast("请先保存 Token");
+        return;
+      }
+      const resp = await fetch("/api/admin/messages/export.csv", { headers: { "X-Admin-Token": token } });
       if (!resp.ok) throw new Error("导出失败");
-
       const blob = await resp.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -523,6 +488,14 @@ function bindActions() {
   });
 }
 
-bindAuthActions();
-bindActions();
-loadAll().catch((e) => toast(e.message || "加载后台数据失败"));
+(async function init() {
+  bindAuth();
+  bindActions();
+
+  if (getToken()) {
+    const ok = await checkConnection();
+    if (ok) await loadAll().catch((e) => toast(e.message || "加载失败"));
+  } else {
+    setConnBadge("未检测", null);
+  }
+})();
