@@ -77,6 +77,8 @@ function initCopyActions() {
   });
 }
 
+let lastSiteDataUpdatedAt = Number(localStorage.getItem("site_data_updated_at") || 0);
+
 function initFooterYear() {
   const y = qs("#year");
   if (y) y.textContent = String(new Date().getFullYear());
@@ -398,9 +400,9 @@ function applyProfile(profile) {
   }
 }
 
-async function loadSiteData() {
+async function loadSiteData(silent = false) {
   try {
-    const resp = await fetch("/api/site-data");
+    const resp = await fetch(`/api/site-data?t=${Date.now()}`, { cache: "no-store" });
     if (!resp.ok) throw new Error("请求失败");
     const data = await resp.json();
 
@@ -409,9 +411,27 @@ async function loadSiteData() {
     projectState.all = Array.isArray(data.projects) ? data.projects : [];
     renderProjectsByState();
     renderExperiences(data.experiences || []);
+    if (!silent) toast("已同步最新数据");
   } catch {
-    toast("未能从数据库加载数据，已使用页面默认内容");
+    if (!silent) toast("未能从数据库加载数据，已使用页面默认内容");
   }
+}
+
+function initDataSyncWatcher() {
+  window.addEventListener("storage", (e) => {
+    if (e.key !== "site_data_updated_at") return;
+    const next = Number(e.newValue || 0);
+    if (!next || next <= lastSiteDataUpdatedAt) return;
+    lastSiteDataUpdatedAt = next;
+    loadSiteData(true);
+  });
+
+  window.setInterval(() => {
+    const next = Number(localStorage.getItem("site_data_updated_at") || 0);
+    if (!next || next <= lastSiteDataUpdatedAt) return;
+    lastSiteDataUpdatedAt = next;
+    loadSiteData(true);
+  }, 3000);
 }
 
 function initBackToTop() {
@@ -534,4 +554,5 @@ initBgm();
 initBackToTop();
 initProjectInteractions();
 initContactForm();
-loadSiteData();
+initDataSyncWatcher();
+loadSiteData(true);

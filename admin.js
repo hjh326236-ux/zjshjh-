@@ -14,6 +14,10 @@ function toast(msg) {
   toast._t = window.setTimeout(() => el.classList.remove("is-on"), 1800);
 }
 
+function notifyFrontendDataChanged() {
+  localStorage.setItem("site_data_updated_at", String(Date.now()));
+}
+
 function setConnBadge(text, ok = null) {
   const el = $("#connBadge");
   if (!el) return;
@@ -50,6 +54,7 @@ async function req(url, options = {}) {
   const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
   if (token) headers["X-Admin-Token"] = token;
 
+  const method = (options.method || "GET").toUpperCase();
   const resp = await fetch(url, { ...options, headers });
   const text = await resp.text();
 
@@ -77,6 +82,7 @@ async function req(url, options = {}) {
   }
 
   setErrorDetail("");
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(method)) notifyFrontendDataChanged();
   return data;
 }
 
