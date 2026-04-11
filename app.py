@@ -89,6 +89,19 @@ def json_body() -> dict[str, Any]:
     return request.get_json(silent=True) or {}
 
 
+def ensure_db_ready() -> tuple[dict[str, str], int] | None:
+    if not DB_PATH.exists():
+        return jsonify({"error": "数据库不存在，请先运行 init_db.py"}), 500
+
+    try:
+        with get_conn() as conn:
+            conn.execute("SELECT 1 FROM profile LIMIT 1")
+    except sqlite3.OperationalError:
+        return jsonify({"error": "数据库结构不完整，请先运行 init_db.py"}), 500
+
+    return None
+
+
 def pick(payload: dict[str, Any], fields: list[str]) -> dict[str, Any]:
     return {k: payload.get(k) for k in fields if k in payload}
 
@@ -105,8 +118,9 @@ def admin_page():
 
 @app.get("/api/site-data")
 def api_site_data():
-    if not DB_PATH.exists():
-        return jsonify({"error": "数据库不存在，请先运行 init_db.py"}), 500
+    db_error = ensure_db_ready()
+    if db_error:
+        return db_error
 
     with get_conn() as conn:
         profile = conn.execute("SELECT * FROM profile ORDER BY id LIMIT 1").fetchone()
@@ -154,6 +168,10 @@ def api_admin_update_profile():
     auth_error = require_admin_token()
     if auth_error:
         return auth_error
+
+    db_error = ensure_db_ready()
+    if db_error:
+        return db_error
 
     payload = json_body()
     data = pick(payload, PROFILE_FIELDS)
