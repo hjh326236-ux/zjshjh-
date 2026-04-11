@@ -35,8 +35,10 @@
         <div class="admin-actions">
           <button class="btn btn--primary" id="saveToken">保存 Token</button>
           <button class="btn btn--ghost" id="clearToken">清除 Token</button>
+          <button class="btn btn--ghost" id="checkConnection">连接自检</button>
         </div>
         <p class="muted tiny">提示：Token 会保存在当前浏览器 LocalStorage。</p>
+        <p class="muted tiny" id="connectionStatus">状态：未检测</p>
       </div>
 
       <div class="card" id="errorBox" style="display:none; margin-bottom:14px; border-color:#ef4444;">

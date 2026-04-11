@@ -230,6 +230,12 @@ function bindAuthActions() {
   const tokenInput = $("#adminToken");
   const saveBtn = $("#saveToken");
   const clearBtn = $("#clearToken");
+  const checkBtn = $("#checkConnection");
+  const status = $("#connectionStatus");
+
+  const setStatus = (text) => {
+    if (status) status.textContent = text;
+  };
 
   if (tokenInput) tokenInput.value = getAdminToken();
 
@@ -241,12 +247,38 @@ function bindAuthActions() {
     }
     setAdminToken(token);
     toast("Token 已保存");
+    setStatus("状态：Token 已保存，建议点击自检");
   });
 
   clearBtn?.addEventListener("click", () => {
     setAdminToken("");
     if (tokenInput) tokenInput.value = "";
     toast("Token 已清除");
+    setStatus("状态：Token 已清除");
+  });
+
+  checkBtn?.addEventListener("click", async () => {
+    const token = tokenInput?.value?.trim() || getAdminToken();
+    if (!token) {
+      toast("请先输入 Token");
+      setStatus("状态：缺少 Token");
+      return;
+    }
+
+    setStatus("状态：检测中...");
+    try {
+      const resp = await fetch("/api/admin/data", {
+        headers: { "X-Admin-Token": token },
+      });
+      const text = await resp.text();
+      if (!resp.ok) throw new Error(text || `HTTP ${resp.status}`);
+      setStatus("状态：连接正常，Token 有效");
+      toast("连接正常");
+    } catch (err) {
+      setStatus("状态：连接失败，请检查 Token 或后端");
+      toast("连接失败");
+      setErrorDetail(`自检失败：${err.message || err}`);
+    }
   });
 }
 

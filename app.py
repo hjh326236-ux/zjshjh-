@@ -77,6 +77,22 @@ def ensure_message_schema() -> None:
 
     with get_conn() as conn:
         cols = conn.execute("PRAGMA table_info(messages)").fetchall()
+        if not cols:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                  id INTEGER PRIMARY KEY,
+                  visitor_name TEXT NOT NULL,
+                  visitor_email TEXT NOT NULL,
+                  message TEXT NOT NULL,
+                  created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                  is_read INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            conn.commit()
+            return
+
         col_names = {c["name"] for c in cols}
 
         if "is_read" not in col_names:
@@ -144,13 +160,20 @@ def api_admin_data():
     if auth_error:
         return auth_error
 
+    db_error = ensure_db_ready()
+    if db_error:
+        return db_error
+
     ensure_message_schema()
-    with get_conn() as conn:
-        profile = conn.execute("SELECT * FROM profile ORDER BY id LIMIT 1").fetchone()
-        skills = rows_to_dicts(conn.execute("SELECT * FROM skills ORDER BY id").fetchall())
-        projects = rows_to_dicts(conn.execute("SELECT * FROM projects ORDER BY sort_order, id").fetchall())
-        experiences = rows_to_dicts(conn.execute("SELECT * FROM experiences ORDER BY sort_order, id").fetchall())
-        messages = rows_to_dicts(conn.execute("SELECT * FROM messages ORDER BY id DESC").fetchall())
+    try:
+        with get_conn() as conn:
+            profile = conn.execute("SELECT * FROM profile ORDER BY id LIMIT 1").fetchone()
+            skills = rows_to_dicts(conn.execute("SELECT * FROM skills ORDER BY id").fetchall())
+            projects = rows_to_dicts(conn.execute("SELECT * FROM projects ORDER BY sort_order, id").fetchall())
+            experiences = rows_to_dicts(conn.execute("SELECT * FROM experiences ORDER BY sort_order, id").fetchall())
+            messages = rows_to_dicts(conn.execute("SELECT * FROM messages ORDER BY id DESC").fetchall())
+    except sqlite3.OperationalError:
+        return jsonify({"error": "数据库结构不完整，请先运行 init_db.py"}), 500
 
     return jsonify(
         {
