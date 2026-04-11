@@ -112,6 +112,27 @@ def ensure_db_ready() -> tuple[dict[str, str], int] | None:
     try:
         with get_conn() as conn:
             conn.execute("SELECT 1 FROM profile LIMIT 1")
+
+            cols = conn.execute("PRAGMA table_info(profile)").fetchall()
+            col_names = {c["name"] for c in cols}
+
+            optional_profile_cols = [
+                "english_name",
+                "city",
+                "direction",
+                "status",
+                "bio",
+                "email",
+                "wechat",
+                "phone",
+                "github_url",
+                "linkedin_url",
+            ]
+            for c in optional_profile_cols:
+                if c not in col_names:
+                    conn.execute(f"ALTER TABLE profile ADD COLUMN {c} TEXT")
+
+            conn.commit()
     except sqlite3.OperationalError:
         return jsonify({"error": "数据库结构不完整，请先运行 init_db.py"}), 500
 
@@ -197,35 +218,43 @@ def api_admin_update_profile():
         return db_error
 
     payload = json_body()
-    data = pick(payload, PROFILE_FIELDS)
 
-    if not data:
-        return jsonify({"error": "没有可更新字段"}), 400
+    try:
+        with get_conn() as conn:
+            cols = conn.execute("PRAGMA table_info(profile)").fetchall()
+            col_names = {c["name"] for c in cols}
 
-    if "name" in data and not str(data["name"] or "").strip():
-        return jsonify({"error": "name 不能为空"}), 400
+            data = {k: payload.get(k) for k in PROFILE_FIELDS if k in payload and k in col_names}
 
-    if "title" in data and not str(data["title"] or "").strip():
-        return jsonify({"error": "title 不能为空"}), 400
+            if not data:
+                return jsonify({"error": "没有可更新字段"}), 400
 
-    with get_conn() as conn:
-        profile = conn.execute("SELECT id FROM profile ORDER BY id LIMIT 1").fetchone()
+            if "name" in data and not str(data["name"] or "").strip():
+                return jsonify({"error": "name 不能为空"}), 400
 
-        if profile:
-            keys = list(data.keys())
-            set_clause = ", ".join([f"{k} = ?" for k in keys])
-            values = [data[k] for k in keys]
-            values.append(profile["id"])
-            conn.execute(f"UPDATE profile SET {set_clause} WHERE id = ?", values)
-        else:
-            keys = ["id", *data.keys()]
-            placeholders = ", ".join(["?"] * len(keys))
-            values = [1, *[data[k] for k in data.keys()]]
-            conn.execute(
-                f"INSERT INTO profile ({', '.join(keys)}) VALUES ({placeholders})",
-                values,
-            )
-        conn.commit()
+            if "title" in data and not str(data["title"] or "").strip():
+                return jsonify({"error": "title 不能为空"}), 400
+
+            profile = conn.execute("SELECT id FROM profile ORDER BY id LIMIT 1").fetchone()
+
+            if profile:
+                keys = list(data.keys())
+                set_clause = ", ".join([f"{k} = ?" for k in keys])
+                values = [data[k] for k in keys]
+                values.append(profile["id"])
+                conn.execute(f"UPDATE profile SET {set_clause} WHERE id = ?", values)
+            else:
+                keys = ["id", *data.keys()]
+                placeholders = ", ".join(["?"] * len(keys))
+                values = [1, *[data[k] for k in data.keys()]]
+                conn.execute(
+                    f"INSERT INTO profile ({', '.join(keys)}) VALUES ({placeholders})",
+                    values,
+                )
+
+            conn.commit()
+    except sqlite3.Error as e:
+        return jsonify({"error": f"保存资料失败：{e}"}), 500
 
     return jsonify({"ok": True})
 
