@@ -18,7 +18,16 @@ if USE_POSTGRES:
     import psycopg
     from psycopg.rows import dict_row
 
-RUNTIME_DB_DIR = Path(os.environ.get("DB_DIR", str(BASE_DIR))).resolve()
+runtime_db_dir_env = os.environ.get("DB_DIR", "").strip()
+if runtime_db_dir_env:
+    RUNTIME_DB_DIR = Path(runtime_db_dir_env).resolve()
+else:
+    # 若部署目录只读（如 /var/task），自动回退到可写临时目录
+    if not USE_POSTGRES and not os.access(BASE_DIR, os.W_OK):
+        RUNTIME_DB_DIR = Path("/tmp/self-intro-site-data").resolve()
+    else:
+        RUNTIME_DB_DIR = BASE_DIR
+
 DB_PATH = RUNTIME_DB_DIR / "self_intro.db"
 
 if not USE_POSTGRES:
@@ -208,7 +217,15 @@ def api_admin_update_profile():
                 cur.execute(f"INSERT INTO profile ({', '.join(keys)}) VALUES ({placeholders})", values)
             conn.commit()
     except Exception as e:
-        return jsonify({"error": f"保存资料失败：{e}"}), 500
+        return jsonify(
+            {
+                "error": f"保存资料失败：{e}",
+                "db_mode": "postgres" if USE_POSTGRES else "sqlite",
+                "db_path": None if USE_POSTGRES else str(DB_PATH),
+                "db_writable": None if USE_POSTGRES else os.access(DB_PATH, os.W_OK),
+                "dir_writable": None if USE_POSTGRES else os.access(DB_PATH.parent, os.W_OK),
+            }
+        ), 500
 
     return jsonify({"ok": True})
 
