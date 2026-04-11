@@ -254,7 +254,14 @@ def api_admin_update_profile():
 
             conn.commit()
     except sqlite3.Error as e:
-        return jsonify({"error": f"保存资料失败：{e}"}), 500
+        return jsonify(
+            {
+                "error": f"保存资料失败：{e}",
+                "db_path": str(DB_PATH),
+                "db_writable": os.access(DB_PATH, os.W_OK),
+                "dir_writable": os.access(BASE_DIR, os.W_OK),
+            }
+        ), 500
 
     return jsonify({"ok": True})
 
