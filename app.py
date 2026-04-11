@@ -20,13 +20,19 @@ if USE_POSTGRES:
 
 runtime_db_dir_env = os.environ.get("DB_DIR", "").strip()
 if runtime_db_dir_env:
+    # 显式指定时优先使用环境变量
     RUNTIME_DB_DIR = Path(runtime_db_dir_env).resolve()
-else:
-    # 若部署目录只读（如 /var/task），自动回退到可写临时目录
-    if not USE_POSTGRES and not os.access(BASE_DIR, os.W_OK):
+elif not USE_POSTGRES:
+    # 默认优先使用项目内持久目录 data/
+    preferred = (BASE_DIR / "data").resolve()
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        RUNTIME_DB_DIR = preferred
+    except OSError:
+        # 仅在项目目录不可写时，才回退到临时目录
         RUNTIME_DB_DIR = Path("/tmp/self-intro-site-data").resolve()
-    else:
-        RUNTIME_DB_DIR = BASE_DIR
+else:
+    RUNTIME_DB_DIR = BASE_DIR
 
 DB_PATH = RUNTIME_DB_DIR / "self_intro.db"
 
