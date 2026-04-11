@@ -13,7 +13,7 @@ DB_PATH = BASE_DIR / "self_intro.db"
 
 app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
 
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "dev-admin-token")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "zjshjh0416")
 
 
 def require_admin_token() -> tuple[dict[str, str], int] | None:
