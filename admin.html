@@ -22,6 +22,23 @@
     <div class="admin-wrap">
       <h1>后台管理</h1>
       <p class="muted">用于维护个人资料、技能、项目、经历。保存后前台会自动使用新数据。</p>
+
+      <div class="card admin-section" id="authBox">
+        <h2 class="card__title">管理访问验证</h2>
+        <p class="muted">请输入管理 Token 才能继续操作（仅本地简单保护）。</p>
+        <div class="admin-grid">
+          <label class="field" style="grid-column: 1 / -1">
+            <span class="field__label">管理 Token</span>
+            <input class="field__input" id="adminToken" type="password" placeholder="输入管理 Token" />
+          </label>
+        </div>
+        <div class="admin-actions">
+          <button class="btn btn--primary" id="saveToken">保存 Token</button>
+          <button class="btn btn--ghost" id="clearToken">清除 Token</button>
+        </div>
+        <p class="muted tiny">提示：Token 会保存在当前浏览器 LocalStorage。</p>
+      </div>
+
       <div class="card" id="errorBox" style="display:none; margin-bottom:14px; border-color:#ef4444;">
         <h3 class="card__title" style="color:#ef4444;">请求错误详情</h3>
         <pre id="errorDetail" class="mono" style="white-space:pre-wrap; margin:0;"></pre>
@@ -90,6 +107,16 @@
         </div>
         <div class="admin-actions"><button class="btn btn--primary" id="addExperience">新增经历</button></div>
         <div class="admin-list" id="experiencesList"></div>
+      </section>
+
+      <section class="card admin-section">
+        <h2 class="card__title">留言管理</h2>
+        <p class="muted">可查看留言、标记已读，并导出 CSV。</p>
+        <div class="admin-actions">
+          <button class="btn btn--ghost" id="refreshMessages">刷新留言</button>
+          <button class="btn btn--primary" id="exportMessages">导出 CSV</button>
+        </div>
+        <div class="admin-list" id="messagesList"></div>
       </section>
 
       <a href="/" class="btn btn--ghost">返回前台</a>

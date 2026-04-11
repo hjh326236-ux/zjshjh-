@@ -4,12 +4,23 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+import os
+
 from flask import Flask, jsonify, request, send_from_directory
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "self_intro.db"
 
 app = Flask(__name__, static_folder=str(BASE_DIR), static_url_path="")
+
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "dev-admin-token")
+
+
+def require_admin_token() -> tuple[dict[str, str], int] | None:
+    token = request.headers.get("X-Admin-Token", "")
+    if not token or token != ADMIN_TOKEN:
+        return jsonify({"error": "未授权：admin token 无效或缺失"}), 401
+    return None
 
 
 PROFILE_FIELDS = [
@@ -60,6 +71,20 @@ def rows_to_dicts(rows: list[sqlite3.Row]) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def ensure_message_schema() -> None:
+    if not DB_PATH.exists():
+        return
+
+    with get_conn() as conn:
+        cols = conn.execute("PRAGMA table_info(messages)").fetchall()
+        col_names = {c["name"] for c in cols}
+
+        if "is_read" not in col_names:
+            conn.execute("ALTER TABLE messages ADD COLUMN is_read INTEGER NOT NULL DEFAULT 0")
+
+        conn.commit()
+
+
 def json_body() -> dict[str, Any]:
     return request.get_json(silent=True) or {}
 
@@ -101,11 +126,35 @@ def api_site_data():
 
 @app.get("/api/admin/data")
 def api_admin_data():
-    return api_site_data()
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
+    ensure_message_schema()
+    with get_conn() as conn:
+        profile = conn.execute("SELECT * FROM profile ORDER BY id LIMIT 1").fetchone()
+        skills = rows_to_dicts(conn.execute("SELECT * FROM skills ORDER BY id").fetchall())
+        projects = rows_to_dicts(conn.execute("SELECT * FROM projects ORDER BY sort_order, id").fetchall())
+        experiences = rows_to_dicts(conn.execute("SELECT * FROM experiences ORDER BY sort_order, id").fetchall())
+        messages = rows_to_dicts(conn.execute("SELECT * FROM messages ORDER BY id DESC").fetchall())
+
+    return jsonify(
+        {
+            "profile": dict(profile) if profile else None,
+            "skills": skills,
+            "projects": projects,
+            "experiences": experiences,
+            "messages": messages,
+        }
+    )
 
 
 @app.put("/api/admin/profile")
 def api_admin_update_profile():
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     payload = json_body()
     data = pick(payload, PROFILE_FIELDS)
 
@@ -142,6 +191,10 @@ def api_admin_update_profile():
 
 @app.post("/api/admin/skills")
 def api_admin_add_skill():
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     payload = json_body()
     category = str(payload.get("category", "")).strip()
     skill_name = str(payload.get("skill_name", "")).strip()
@@ -170,6 +223,10 @@ def api_admin_add_skill():
 
 @app.put("/api/admin/skills/<int:skill_id>")
 def api_admin_update_skill(skill_id: int):
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     payload = json_body()
     category = str(payload.get("category", "")).strip()
     skill_name = str(payload.get("skill_name", "")).strip()
@@ -201,6 +258,10 @@ def api_admin_update_skill(skill_id: int):
 
 @app.delete("/api/admin/skills/<int:skill_id>")
 def api_admin_delete_skill(skill_id: int):
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     with get_conn() as conn:
         conn.execute("DELETE FROM skills WHERE id = ?", (skill_id,))
         conn.commit()
@@ -209,6 +270,10 @@ def api_admin_delete_skill(skill_id: int):
 
 @app.post("/api/admin/projects")
 def api_admin_add_project():
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     payload = json_body()
     data = pick(payload, PROJECT_FIELDS)
 
@@ -232,6 +297,10 @@ def api_admin_add_project():
 
 @app.put("/api/admin/projects/<int:project_id>")
 def api_admin_update_project(project_id: int):
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     payload = json_body()
     data = pick(payload, PROJECT_FIELDS)
 
@@ -258,6 +327,10 @@ def api_admin_update_project(project_id: int):
 
 @app.delete("/api/admin/projects/<int:project_id>")
 def api_admin_delete_project(project_id: int):
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     with get_conn() as conn:
         conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
         conn.commit()
@@ -266,6 +339,10 @@ def api_admin_delete_project(project_id: int):
 
 @app.post("/api/admin/experiences")
 def api_admin_add_experience():
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     payload = json_body()
     data = pick(payload, EXPERIENCE_FIELDS)
 
@@ -292,6 +369,10 @@ def api_admin_add_experience():
 
 @app.put("/api/admin/experiences/<int:experience_id>")
 def api_admin_update_experience(experience_id: int):
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     payload = json_body()
     data = pick(payload, EXPERIENCE_FIELDS)
 
@@ -322,10 +403,73 @@ def api_admin_update_experience(experience_id: int):
 
 @app.delete("/api/admin/experiences/<int:experience_id>")
 def api_admin_delete_experience(experience_id: int):
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
     with get_conn() as conn:
         conn.execute("DELETE FROM experiences WHERE id = ?", (experience_id,))
         conn.commit()
     return jsonify({"ok": True})
+
+
+@app.put("/api/admin/messages/<int:message_id>/read")
+def api_admin_mark_message_read(message_id: int):
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
+    ensure_message_schema()
+    payload = json_body()
+    is_read = 1 if payload.get("is_read", True) else 0
+
+    with get_conn() as conn:
+        cur = conn.execute("UPDATE messages SET is_read = ? WHERE id = ?", (is_read, message_id))
+        conn.commit()
+
+    if cur.rowcount == 0:
+        return jsonify({"error": "message 不存在"}), 404
+
+    return jsonify({"ok": True})
+
+
+@app.get("/api/admin/messages/export.csv")
+def api_admin_export_messages_csv():
+    auth_error = require_admin_token()
+    if auth_error:
+        return auth_error
+
+    ensure_message_schema()
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT id, visitor_name, visitor_email, message, is_read, created_at FROM messages ORDER BY id DESC"
+        ).fetchall()
+
+    def esc(v: Any) -> str:
+        text = str(v or "").replace('"', '""')
+        return f'"{text}"'
+
+    lines = ["id,visitor_name,visitor_email,message,is_read,created_at"]
+    for r in rows:
+        lines.append(
+            ",".join(
+                [
+                    esc(r["id"]),
+                    esc(r["visitor_name"]),
+                    esc(r["visitor_email"]),
+                    esc(r["message"]),
+                    esc(r["is_read"]),
+                    esc(r["created_at"]),
+                ]
+            )
+        )
+
+    content = "\n".join(lines)
+    return app.response_class(
+        content,
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="messages.csv"'},
+    )
 
 
 @app.post("/api/messages")

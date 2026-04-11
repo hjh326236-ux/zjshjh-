@@ -1,4 +1,14 @@
 const $ = (s, el = document) => el.querySelector(s);
+const ADMIN_TOKEN_KEY = "self_intro_admin_token";
+
+function getAdminToken() {
+  return localStorage.getItem(ADMIN_TOKEN_KEY) || "";
+}
+
+function setAdminToken(token) {
+  if (!token) localStorage.removeItem(ADMIN_TOKEN_KEY);
+  else localStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
 
 function toast(msg) {
   const el = $("#toast");
@@ -24,9 +34,16 @@ function setErrorDetail(text = "") {
 
 async function req(url, options = {}) {
   try {
+    const token = getAdminToken();
+    const headers = {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    };
+    if (token) headers["X-Admin-Token"] = token;
+
     const resp = await fetch(url, {
-      headers: { "Content-Type": "application/json" },
       ...options,
+      headers,
     });
 
     const text = await resp.text();
@@ -145,12 +162,46 @@ function renderExperiences(experiences = []) {
     .join("");
 }
 
+function renderMessages(messages = []) {
+  const root = $("#messagesList");
+  if (!root) return;
+
+  if (!messages.length) {
+    root.innerHTML = '<div class="item"><p class="muted">暂无留言</p></div>';
+    return;
+  }
+
+  root.innerHTML = messages
+    .map(
+      (m) => `
+      <div class="item">
+        <div class="row" style="align-items:flex-start;">
+          <div>
+            <strong>${m.visitor_name || "匿名"}</strong>
+            <div class="mono">${m.visitor_email || "-"} · ${m.created_at || ""}</div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <span class="badge ${m.is_read ? "badge--soft" : ""}">${m.is_read ? "已读" : "未读"}</span>
+            <button class="btn btn--tiny btn--ghost" data-mark-read="${m.id}">${m.is_read ? "标记未读" : "标记已读"}</button>
+          </div>
+        </div>
+        <p class="muted" style="margin-top:8px;">${(m.message || "").replaceAll("<", "&lt;").replaceAll(">", "&gt;")}</p>
+      </div>
+    `
+    )
+    .join("");
+}
+
+let latestMessages = [];
+
 async function loadAll() {
   const data = await req("/api/admin/data");
   fillProfile(data.profile || {});
   renderSkills(data.skills || []);
   renderProjects(data.projects || []);
   renderExperiences(data.experiences || []);
+  latestMessages = data.messages || [];
+  renderMessages(latestMessages);
 }
 
 function profilePayload() {
@@ -173,6 +224,30 @@ function profilePayload() {
     out[k] = $(`#p_${k}`)?.value?.trim() ?? "";
   });
   return out;
+}
+
+function bindAuthActions() {
+  const tokenInput = $("#adminToken");
+  const saveBtn = $("#saveToken");
+  const clearBtn = $("#clearToken");
+
+  if (tokenInput) tokenInput.value = getAdminToken();
+
+  saveBtn?.addEventListener("click", () => {
+    const token = tokenInput?.value?.trim() || "";
+    if (!token) {
+      toast("请输入 Token");
+      return;
+    }
+    setAdminToken(token);
+    toast("Token 已保存");
+  });
+
+  clearBtn?.addEventListener("click", () => {
+    setAdminToken("");
+    if (tokenInput) tokenInput.value = "";
+    toast("Token 已清除");
+  });
 }
 
 function bindActions() {
@@ -357,7 +432,65 @@ function bindActions() {
       toast(err.message || "删除失败");
     }
   });
+
+  $("#messagesList")?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-mark-read]");
+    if (!btn) return;
+
+    const id = btn.dataset.markRead;
+    const row = latestMessages.find((m) => String(m.id) === String(id));
+    const next = !(row?.is_read === 1 || row?.is_read === true);
+
+    try {
+      await req(`/api/admin/messages/${id}/read`, {
+        method: "PUT",
+        body: JSON.stringify({ is_read: next }),
+      });
+      toast(next ? "已标记为已读" : "已标记为未读");
+      await loadAll();
+    } catch (err) {
+      toast(err.message || "更新失败");
+    }
+  });
+
+  $("#refreshMessages")?.addEventListener("click", async () => {
+    try {
+      await loadAll();
+      toast("留言已刷新");
+    } catch (err) {
+      toast(err.message || "刷新失败");
+    }
+  });
+
+  $("#exportMessages")?.addEventListener("click", async () => {
+    const token = getAdminToken();
+    if (!token) {
+      toast("请先保存管理 Token");
+      return;
+    }
+
+    try {
+      const resp = await fetch("/api/admin/messages/export.csv", {
+        headers: { "X-Admin-Token": token },
+      });
+      if (!resp.ok) throw new Error("导出失败");
+
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "messages.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast("CSV 导出成功");
+    } catch (err) {
+      toast(err.message || "导出失败");
+    }
+  });
 }
 
+bindAuthActions();
 bindActions();
 loadAll().catch((e) => toast(e.message || "加载后台数据失败"));

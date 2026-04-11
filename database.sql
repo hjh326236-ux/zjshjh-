@@ -58,6 +58,7 @@ CREATE TABLE messages (
   visitor_name TEXT NOT NULL,
   visitor_email TEXT NOT NULL,
   message TEXT NOT NULL,
+  is_read INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
 
